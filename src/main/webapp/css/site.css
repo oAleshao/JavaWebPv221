@@ -1,0 +1,28 @@
+body{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 100vh;
+}
+
+.spacer{
+    flex: 1;
+}
+
+.nav-addon{
+    margin-right: 20px;
+}
+
+.site-logo{
+    font-size: xx-large;
+    margin: 0 20px;
+}
+
+.site-logo img{
+    max-height: 45px;
+    vertical-align: middle;
+}
+
+.my-table{
+    margin-bottom: 100px;
+}

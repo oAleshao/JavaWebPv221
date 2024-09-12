@@ -1,0 +1,43 @@
+<!DOCTYPE web-app PUBLIC
+ "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+ "http://java.sun.com/dtd/web-app_2_3.dtd" >
+
+<web-app>
+  <display-name>PV-221 Web Application</display-name>
+
+
+  <filter>
+    <filter-name>guiceFilter</filter-name>
+    <filter-class>com.google.inject.servlet.GuiceFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>guiceFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+  </filter-mapping>
+
+  <listener>
+    <listener-class>itstep.learning.ioc.AppContextListener</listener-class>
+  </listener>
+
+  <!-- region -->
+
+<!--  <filter>-->
+<!--    <filter-name>charsetFilter</filter-name>-->
+<!--    <filter-class>itstep.learning.filters.CharsetFilter</filter-class>-->
+<!--  </filter>-->
+<!--  <filter-mapping>-->
+<!--    <filter-name>charsetFilter</filter-name>-->
+<!--    <url-pattern>/*</url-pattern>-->
+<!--  </filter-mapping>-->
+
+<!--  <servlet>-->
+<!--    <servlet-name>homeServlet</servlet-name>-->
+<!--    <servlet-class>itstep.learning.servlets.HomeServlet</servlet-class>-->
+<!--  </servlet>-->
+<!--  <servlet-mapping>-->
+<!--    <servlet-name>homeServlet</servlet-name>-->
+<!--    <url-pattern></url-pattern>-->
+<!--  </servlet-mapping>-->
+  <!-- endregion -->
+
+</web-app>
