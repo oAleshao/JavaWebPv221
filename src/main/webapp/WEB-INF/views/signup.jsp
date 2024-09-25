@@ -5,6 +5,11 @@
     String contextPath = request.getContextPath();
 %>
 
+<div id="user-data">
+
+</div>
+
+
 <form id="signup-form"
       class="card-panel grey lighten-5"
       enctype="multipart/form-data"

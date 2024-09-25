@@ -1,7 +1,4 @@
 document.addEventListener("submit", e =>{
-
-
-
     const form = e.target;
    if(form.id === "signup-form"){
        e.preventDefault();
@@ -9,7 +6,7 @@ document.addEventListener("submit", e =>{
        fetch(form.action, {
            method: "POST",
            body: formData
-       }).then(r=>r.json()).then(j=>console.log(j));
+       }).then(r=>r.json()).then(j=> putUserData(j.data));
    }
    else if(form.id === "modal-auth-form"){
        e.preventDefault();
@@ -29,6 +26,13 @@ document.addEventListener("submit", e =>{
 
 });
 
+function putUserData(data){
+    const box = document.getElementById("user-data");
+
+    let innerHTML = `<b>Name: ${data["name"]}</b><br/><b>Email: ${data["email"]}</b><br/><b>Birhday: ${data["birthday"]}</b><br/><b>Avatar: ${data["avatar"]}</b><br/><b>Password: ${data["password"]}</b><br/>`;
+
+    box.innerHTML = innerHTML;
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     M.Modal.init(
