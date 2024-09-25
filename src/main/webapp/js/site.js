@@ -6,7 +6,7 @@ document.addEventListener("submit", e =>{
        fetch(form.action, {
            method: "POST",
            body: formData
-       }).then(r=>r.json()).then(j=> putUserData(j.data));
+       }).then(r=>r.json()).then(j=> putUserData(j));
    }
    else if(form.id === "modal-auth-form"){
        e.preventDefault();
@@ -26,9 +26,25 @@ document.addEventListener("submit", e =>{
 
 });
 
-function putUserData(data){
+function putUserData(j){
+
     const box = document.getElementById("user-data");
 
+    if(j.status === "Error"){
+        let splitedError = j.data.split("-", 2);
+        const inputElement = document.querySelector(`[name='${splitedError[0]}']`)
+        box.innerHTML = `<b>${splitedError[1]}<b/>`;
+        box.style.color = "red";
+        inputElement.focus();
+        inputElement.addEventListener("blur", (e)=>{
+            box.innerHTML = "";
+        })
+        return;
+    }
+
+    const data = j.data;
+
+    box.style.color = "black";
     let innerHTML = `<b>Name: ${data["name"]}</b><br/><b>Email: ${data["email"]}</b><br/><b>Birhday: ${data["birthday"]}</b><br/><b>Avatar: ${data["avatar"]}</b><br/><b>Password: ${data["password"]}</b><br/>`;
 
     box.innerHTML = innerHTML;

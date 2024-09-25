@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 
 @Singleton
@@ -129,17 +130,26 @@ public class SignupServlet extends HttpServlet {
         SimpleDateFormat dateParser = new SimpleDateFormat("dd-MM-yyyy");
 
         FormParseResult res = formParseService.parse(request);
+        Pattern patternAZ = Pattern.compile("[^a-zA-Z]");
+        Pattern email = Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{6,}$");
+        Pattern pass = Pattern.compile("[^a-zA-Z0-9_$]{6,}]");
 
         SignupModel model = new SignupModel();
         model.setName(res.getFields().get("user_name"));
         if (model.getName() == null || model.getName().isEmpty()) {
-            throw new Exception("user_name - is required");
+            throw new Exception("user_name-Name is required");
+        }
+        if(patternAZ.matcher(model.getName()).find()){
+            throw new Exception("user_name-Is not a valid username");
         }
 
 
         model.setEmail(res.getFields().get("user_email"));
         if (model.getEmail() == null || model.getEmail().isEmpty()) {
-            throw new Exception("user_email - is required");
+            throw new Exception("user_email-Email is required");
+        }
+        if (email.matcher(model.getEmail()).find()) {
+            throw new Exception("user_email-Is not a valid email");
         }
 
 
@@ -148,18 +158,29 @@ public class SignupServlet extends HttpServlet {
                     res.getFields().get("user_birth")
             ));
         } catch (ParseException e) {
-            throw new Exception(e.getMessage());
+            throw new Exception("user_birth-Birth day is not a valid date");
         }
 
         String uploadedName = null;
         FileItem avatar = res.getFiles().get("user_avatar");
         if (res.getFiles().get("user_avatar").getSize() > 0) {
             uploadedName = fileService.upload(avatar);
-            model.setAvatar(uploadedName);
+            model.setAvatar(uploadedName + " | size: " + res.getFiles().get("user_avatar").getSize());
         }
-        System.out.println(uploadedName);
+        else {
+            throw new Exception("user_avatar-Avatar is required");
+        }
 
         model.setPassword(res.getFields().get("user_pass"));
+        if (model.getPassword() == null || model.getPassword().isEmpty()) {
+            throw new Exception("user_pass-Password is required");
+        }
+        if(pass.matcher(model.getPassword()).find()){
+            throw new Exception("user_pass-You can use A-Z, a-z, numbers and ' _ ', ' $ ' for password");
+        }
+        if(!model.getPassword().equals(res.getFields().get("user_pass_confirm"))){
+            throw new Exception("user_pass-Passwords does not match");
+        }
 
         return model;
     }
