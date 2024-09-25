@@ -5,6 +5,7 @@ import com.google.inject.Singleton;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.Random;
 
 @Singleton
 public class CharsetFilter implements Filter {
@@ -20,7 +21,12 @@ public class CharsetFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
-        System.out.println("Filter works for " + ((HttpServletRequest) request).getRequestURI());
+        request.setAttribute("charset", "UTF-8");
+
+        boolean flag = new Random().nextBoolean();
+        request.setAttribute("Control", flag);
+
+
         chain.doFilter(request, response);
     }
 

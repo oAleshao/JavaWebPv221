@@ -5,6 +5,14 @@
 <h1>Home</h1>
 <a href="servlets">Servlets</a>
 
+<div>
+    <%=request.getAttribute("access")%>
+</div>
+
+<div>
+    <%=request.getAttribute("hash")%>
+</div>
+
 <table class="my-table">
     <tbody>
     <tr>

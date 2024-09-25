@@ -30,3 +30,10 @@ body{
 .activeLink{
     background: #00acc1;
 }
+
+.nav-avatar{
+    margin-top: 10px;
+    max-height: 45px;
+    max-width: 45px;
+    border-radius: 50%;
+}
