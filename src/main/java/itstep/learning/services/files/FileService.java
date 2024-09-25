@@ -7,6 +7,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public interface FileService {
-    String upload(FileItem fileItem);
+    String upload(FileItem fileItem) throws Exception;
     InputStream download(String filename) throws IOException;
 }

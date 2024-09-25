@@ -41,25 +41,31 @@ public class LocalFileService implements FileService {
     }
 
     @Override
-    public String upload(FileItem fileItem) {
+    public String upload(FileItem fileItem) throws Exception {
         String formFile = fileItem.getName();
         // відокремлюємо розширення
         int dotPossition = formFile.lastIndexOf('.');
         String extension = formFile.substring(dotPossition);
-        String fileName;
-        File file;
-        do{
-            fileName = UUID.randomUUID().toString() + extension;
-            file = new File(this.uploadPath, fileName);
-        }while (file.exists());
+        System.out.println(extension);
+        if(extension.equals(".png") || extension.equals(".jpg") || extension.equals(".svg")) {
+            String fileName;
+            File file;
+            do {
+                fileName = UUID.randomUUID().toString() + extension;
+                file = new File(this.uploadPath, fileName);
+            } while (file.exists());
 
-        try {
-            fileItem.write(file);
+            try {
+                fileItem.write(file);
 
-        }catch (Exception ex) {
-            return null;
+            } catch (Exception ex) {
+                return null;
+            }
+            return fileName;
         }
-        return fileName;
+        else {
+            throw new Exception("user_avatar-You can add only .png .jpg .svg");
+        }
     }
 
     @Override

@@ -164,7 +164,11 @@ public class SignupServlet extends HttpServlet {
         String uploadedName = null;
         FileItem avatar = res.getFiles().get("user_avatar");
         if (res.getFiles().get("user_avatar").getSize() > 0) {
-            uploadedName = fileService.upload(avatar);
+            try {
+                uploadedName = fileService.upload(avatar);
+            }catch (Exception ex){
+                throw new Exception( ex.getMessage());
+            }
             model.setAvatar(uploadedName + " | size: " + res.getFiles().get("user_avatar").getSize());
         }
         else {

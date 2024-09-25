@@ -37,7 +37,7 @@
         <div class="file-field input-field col s6">
             <div class="btn cyan">
                 <i class="material-icons">account_circle</i>
-                <input type="file" name="user_avatar">
+                <input type="file" name="user_avatar"  accept=".png, .jpg, .svg">
             </div>
             <div class="file-path-wrapper">
                 <input class="file-path validate" type="text">
