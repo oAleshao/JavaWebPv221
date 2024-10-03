@@ -22,12 +22,36 @@ public class TokenDao {
         this.logger = logger;
     }
 
+    public User getUserByToken(UUID tokenId) throws Exception {
+
+        String sql = "SELECT * FROM tokens t JOIN users u ON t.user_id = u.id WHERE token_id = ?";
+
+        try(PreparedStatement prep = connection.prepareStatement(sql)) {
+            prep.setString(1, tokenId.toString());
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                Token token = new Token(rs);
+                if(token.getExp().before(new Date())) {
+                    throw new Exception("Token expired");
+                }
+                return new User(rs);
+            }
+            else {
+                throw new Exception("Token rejected");
+            }
+        }catch (SQLException ex){
+            logger.log(Level.WARNING, ex.getMessage(), ex);
+            throw new Exception("Server error. Details on server logs");
+        }
+    }
+
+
     public Token create(User user) {
         Token token = new Token();
         token.setTokenId(UUID.randomUUID());
         token.setUserId(user.getId());
         token.setIat(new Date(System.currentTimeMillis()));
-        token.setExp(new Date(System.currentTimeMillis() + 1000 * 60 * 5));
+        token.setExp(new Date(System.currentTimeMillis() + 1000 * 3600 * 3));
 
         String sql = "INSERT INTO tokens (token_id, user_id, exp, iat) VALUES (?, ?, ?, ?)";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {

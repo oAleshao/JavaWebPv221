@@ -37,3 +37,30 @@ body{
     max-width: 45px;
     border-radius: 50%;
 }
+
+.shop-category {
+    border: 1px solid lightgray;
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: bottom;
+    margin: 10px;
+    overflow: hidden;
+    /*padding: 10px;*/
+    width: 20vw;
+    height: 20vw;
+}
+.shop-category b {
+    display: block;
+}
+.shop-category picture {
+    background-color: lightgray;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 12vw;
+    width: 20vw;
+}
+.shop-category img {
+    max-height: 100%;
+    max-width: 90%;
+}

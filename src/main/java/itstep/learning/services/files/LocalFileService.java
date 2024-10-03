@@ -46,7 +46,6 @@ public class LocalFileService implements FileService {
         // відокремлюємо розширення
         int dotPossition = formFile.lastIndexOf('.');
         String extension = formFile.substring(dotPossition);
-        System.out.println(extension);
         if(extension.equals(".png") || extension.equals(".jpg") || extension.equals(".svg")) {
             String fileName;
             File file;
