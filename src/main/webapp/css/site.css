@@ -1,9 +1,83 @@
 body{
+    position: relative;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     min-height: 100vh;
 }
+
+.auth-user-box{
+    position: absolute;
+    top: -70px;
+    right: 0;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: middle;
+    display: flex;
+}
+
+.auth-user-box img{
+    border-radius: 50%;
+    height: 50px;
+    margin-top: 10px;
+    margin-left: 10px;
+}
+
+
+.nonactiveBox{
+    display: none;
+}
+
+.helper-box-exit{
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 6;
+    border: 1px solid #00bcd4;
+    padding-block: 10px;
+    padding-inline: 16px;
+    border-radius: 0.25rem;
+    box-shadow: 1px 1px 1px 1px #00bcd4;
+    background: white;
+}
+
+.helper-box-exit div {
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.helper-box-exit div:nth-child(2){
+    text-align: right;
+    margin-top: 16px;
+}
+
+
+.helper-box-exit div:nth-child(2) button{
+    margin-inline: 5px;
+    background: #00bcd4;
+    border: 1px solid #00bcd4;
+    border-radius: 0.25rem;
+    padding: 6px;
+    transition: 0.2s;
+    color: white;
+}
+
+
+.helper-box-exit div:nth-child(2) button:nth-child(2){
+    background: white;
+    border: 1px solid grey;
+    color: black;
+}
+
+.helper-box-exit div:nth-child(2) button:hover{
+    cursor: pointer;
+    background: #01a2b5;
+    color: white;
+    border: 1px solid #00bcd4;
+}
+
 
 .spacer{
     flex: 1;
@@ -38,7 +112,8 @@ body{
     border-radius: 50%;
 }
 
-.shop-category {
+.shop-category,
+.shop-product{
     border: 1px solid lightgray;
     cursor: pointer;
     display: inline-block;
@@ -49,10 +124,12 @@ body{
     width: 20vw;
     height: 20vw;
 }
-.shop-category b {
+.shop-category b,
+.shop-product b {
     display: block;
 }
-.shop-category picture {
+.shop-category picture,
+.shop-product picture {
     background-color: lightgray;
     display: flex;
     align-items: center;
@@ -60,7 +137,18 @@ body{
     height: 12vw;
     width: 20vw;
 }
-.shop-category img {
+.shop-category img,
+.shop-product img{
     max-height: 100%;
     max-width: 90%;
+}
+
+.buttons-block{
+    position: relative;
+}
+
+#exitBtn{
+    position: absolute;
+    top: 0;
+    right: 0;
 }

@@ -41,24 +41,27 @@ public class UserDao {
         return null;
     }
 
-    public User authenticate(String login, String password){
+    public User authenticate(String login, String password) throws Exception{
         String sql = "SELECT * FROM users JOIN users_security " +
                 " ON users.id = users_security.user_id " +
                 " WHERE users_security.login = ? ";
         try(PreparedStatement prop = connection.prepareStatement(sql)) {
             prop.setString(1, login);
             ResultSet res = prop.executeQuery();
-            if(res.next()){
+            if(res.next()) {
                 String salt = res.getString("salt");
                 String dk = res.getString("dk");
-                if(hashService.digest(salt + password).equals(dk)){
-                   return new User(res);
+                if (hashService.digest(salt + password).equals(dk)) {
+                    return new User(res);
+                }
+                else {
+                    throw new Exception("password invalid");
                 }
             }
-        }catch (SQLException ex){
-            logger.log(Level.WARNING, ex.getMessage(), ex);
+            throw new Exception("login invalid");
+        }catch (Exception ex){
+            throw new Exception("Server error");
         }
-        return null;
     }
 
     public boolean installTables(){

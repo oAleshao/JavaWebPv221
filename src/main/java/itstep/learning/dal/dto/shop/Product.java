@@ -1,5 +1,9 @@
 package itstep.learning.dal.dto.shop;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.UUID;
 
 public class Product {
@@ -10,8 +14,23 @@ public class Product {
     private double price;
     private String description;
     private String imageUrl;
+    private Date deleteDt;
 
     public Product() {}
+
+    public Product(ResultSet resultSet) throws SQLException {
+        this.setId(UUID.fromString(resultSet.getString("product_id")))
+                .setCategoryId(UUID.fromString(resultSet.getString("category_id")))
+                .setSlug(resultSet.getString("product_slug"))
+                .setDescription(resultSet.getString("product_description"))
+                .setName(resultSet.getString("product_name"))
+                .setImageUrl(resultSet.getString("product_image_url"))
+                .setPrice(resultSet.getDouble("product_price"));
+        Timestamp timestamp = resultSet.getTimestamp("delete_dt");
+        if (timestamp != null) {
+            this.setDeleteDt(new Date(timestamp.getTime()));
+        }
+    }
 
     public UUID getId() {
         return id;
@@ -66,6 +85,14 @@ public class Product {
     }
     public Product setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+        return this;
+    }
+
+    public Date getDeleteDt() {
+        return deleteDt;
+    }
+    public Product setDeleteDt(Date deleteDt) {
+        this.deleteDt = deleteDt;
         return this;
     }
 

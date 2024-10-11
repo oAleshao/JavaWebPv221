@@ -1,7 +1,9 @@
 ﻿const initialState = {
     page: "home",
     auth: {
-        token: null
+        token: null,
+        user: null,
+        user_role: null
     },
     shop: {
         categories: []
@@ -16,6 +18,22 @@ function reducer(state, action) {
                 auth: {
                     ...state.auth,
                     token: action.payload
+                }
+            }
+        case "updateUser":
+            return {
+                ...state,
+                auth: {
+                    ...state.auth,
+                    user: action.payload
+                }
+            }
+        case "setUserRole":
+            return {
+                ...state,
+                auth: {
+                    ...state.auth,
+                    user_role: action.payload
                 }
             }
         case "navigate":
@@ -50,6 +68,32 @@ function Spa() {
 
     const loginChange = React.useCallback((e) => setLogin(e.target.value));
     const passwordChange = React.useCallback((e) => setPassword(e.target.value));
+    const getUser = function (tokenId) {
+        fetch('auth', {
+            method: "GET",
+            headers: {
+                'Authorization': 'UserGet ' + tokenId
+            }
+        })
+            .then(r => r.json())
+            .then(j => {
+                dispatch({type: "updateUser", payload: j.data})
+                getUserRole(j.data.roleId);
+            })
+    };
+    const getUserRole = function (roleId){
+        fetch('auth', {
+            method: "GET",
+            headers: {
+                'Authorization': 'UserRoleGet ' + roleId
+            }
+        })
+            .then(r => r.json())
+            .then(j => {
+                dispatch({type: "setUserRole", payload: j.data})
+                console.log(j.data);
+            })
+    }
     const authClick = React.useCallback(() => {
         const credentials = btoa(login + ":" + password);
         fetch(`auth`, {
@@ -58,8 +102,9 @@ function Spa() {
                 'Authorization': 'Basic ' + credentials
             }
         }).then(r => r.json()).then(j => {
-                if (j.status === "OK") {
+                if (j.status.phrase === "OK") {
                     window.sessionStorage.setItem("token_pv221", JSON.stringify(j.data));
+                    getUser(j.data.tokenId);
                     setAuth(true);
                 } else {
                     setError(j.data);
@@ -93,6 +138,9 @@ function Spa() {
         window.sessionStorage.removeItem("token_pv221");
         setAuth(false);
     });
+    const userLogOut = React.useCallback(() => {
+        document.querySelector("div.helper-box-exit").classList.toggle("nonactiveBox");
+    });
     const checkToken = React.useCallback(() => {
         let token = window.sessionStorage.getItem("token_pv221");
         if (token) {
@@ -113,18 +161,34 @@ function Spa() {
         const action = {type: "navigate", payload: root};
         dispatch(action);
     });
-
-
-    React.useEffect(() => {
-
+    const hashWindow = React.useCallback(() => {
         const hash = window.location.hash;
-        if(hash.length > 1){
+        if (hash.length > 1) {
             dispatch({type: "navigate", payload: hash.substring(1)});
         }
+    })
 
+    React.useEffect(() => {
+        hashWindow();
+        window.addEventListener("hashchange", hashWindow)
         checkToken();
+        let token = window.sessionStorage.getItem("token_pv221");
+        if (token) {
+            token = JSON.parse(token);
+            getUser(token.tokenId);
+        }
         const interval = setInterval(checkToken, 1000);
-        return () => clearInterval(interval);
+
+        if (state.shop.categories.length === 0) {
+            fetch("shop/category")
+                .then(r => r.json())
+                .then(j => dispatch({type: "setCategory", payload: j.data}));
+        }
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('hashchange', hashWindow);
+        }
     }, []);
 
 
@@ -137,46 +201,64 @@ function Spa() {
                 <b>Password</b>
                 <input type="password" onChange={passwordChange} placeholder="password"/>
                 <button onClick={authClick}>Get Token</button>
-                {error && <b>{error}</b>}
+                {error && <b> {error} </b>}
             </div>
         }
         {isAuth &&
-
-
             <div>
-                <div>
+                <div className={"buttons-block"}>
                     <button onClick={resourceClick} className="btn cyan">Resource</button>
                     <p>{resource}</p>
-                    <button onClick={exitClick} className="btn blue lighted-3">Exit</button>
+                    <button id={"exitBtn"} onClick={userLogOut} className="btn blue lighted-3">Exit</button>
+                    <div className={"helper-box-exit nonactiveBox"}>
+                        <div>Are you sure you want to log out?</div>
+                        <div>
+                            <button onClick={exitClick}>Log out</button>
+                            <button onClick={userLogOut}>Cancel</button>
+                        </div>
+                    </div>
+                    {state.auth.user &&
+                        <div className={"auth-user-box"}>
+                            <p>{state.auth.user.name}</p>
+                            <img src={"file/" + state.auth.user.avatar} alt={state.auth.user.avatar}/>
+                        </div>
+                    }
                 </div>
-                <b onClick={() => {
+                <b key={"btnHome"} onClick={() => {
                     navigate('home')
                 }}>Home</b>
 
-                <b onClick={() => {
-                    navigate('shop')
-                }}>Shop</b>
+                {state.auth.user && state.auth.user_role.name === "admin" && state.auth.user_role.canCreate &&
+                    <b key={"btnShop"} onClick={() => {
+                        navigate('shop')
+                    }}>Shop</b>
+                }
 
-                {state.page === "home" && <Home  key={"UNIQUE HOME"}/>}
-                {state.page === "shop" && <Shop key={"UNIQUE SHOP"}/>}
-                {state.page.startsWith('category/') && <Category id={state.page.substring(9)}/>}
+                {state.page === "home" && <Home key={"UNIQUE HOME"}/>}
+                {state.page === "shop" && state.auth.user && state.auth.user_role.name === "admin" && state.auth.user_role.canCreate &&
+                    <Shop key={"UNIQUE SHOP"}/>}
+                {state.page.startsWith('category/') && <Category id={state.page.substring(9)}/>
+                }
+                {
+                    state.page.startsWith('product/') && <Product id={state.page.substring(8)}/>
+                }
+
             </div>
         }
     </StateContext.Provider>)
 }
 
 function Home() {
-    const {state, dispatch} = React.useContext(StateContext);
-    React.useEffect(() => {
-        if (state.shop.categories.length === 0) {
-            fetch("shop/category")
-                .then(r => r.json())
-                .then(j => dispatch({type: "setCategory", payload: j.data}));
-        }
-    }, []);
     return <React.Fragment>
         <h2>Home</h2>
         <b onClick={() => dispatch({type: "navigate", payload: "shop"})}>Log in as admin</b>
+        <CategoriesList/>
+    </React.Fragment>
+}
+
+function CategoriesList() {
+    const {state, dispatch} = React.useContext(StateContext);
+    return <React.Fragment>
         <div>
             {state.shop.categories.map(c =>
                 <div className="shop-category" key={c.id}
@@ -190,10 +272,39 @@ function Home() {
     </React.Fragment>
 }
 
+function Product({id}) {
+    const [product, setProduct] = React.useState(null);
+    React.useEffect(() => {
+        fetch("shop/product?id=" + id)
+            .then(r => r.json())
+            .then(j => {
+                if (j.status === "OK") {
+                    setProduct(j.data);
+                } else {
+                    console.log(j.data);
+                    setProduct(null);
+                }
+            })
+    }, [id]);
+    return <div>
+        <h1>Page of product</h1>
+        {product && <div>
+            <p>{product.name}</p>
+        </div>
+        }
+        {!product && <div>
+            <b>We are looking for...</b>
+        </div>
+        }
+
+        <CategoriesList/>
+    </div>
+}
+
 function Category({id}) {
     const {state, dispatch} = React.useContext(StateContext);
-
-    const addProduct = React.useCallback((e)=>{
+    const [products, setProducts] = React.useState([]);
+    const addProduct = React.useCallback((e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         fetch("shop/product", {
@@ -202,33 +313,69 @@ function Category({id}) {
                 "Authorization": "Bearer " + state.auth.token.tokenId
             },
             body: formData
-        }).then(r => r.json()).then(console.log);
+        }).then(r => r.json()).then(j => {
+            if (j.status === "OK") {
+                loadProducts();
+                document.getElementById("productForm").reset();
+            } else {
+                alert(j.data);
+            }
+        });
     });
+    const loadProducts = React.useCallback(() => {
+        fetch("shop/product?categoryId=" + id)
+            .then(r => r.json())
+            .then(j => {
+                setProducts(j.data.data);
+            })
+    });
+    React.useEffect(() => {
+        loadProducts();
+    }, []);
 
     return <div>
         Category: {id}<br/>
-        <b onClick={() => dispatch({type: "navigate", payload: "home"})}>Go back</b>
-        {state.auth.token &&
-            <form onSubmit={addProduct} encType="multipart/form-data">
-                <hr/>
-                <input type="hidden" name="product_category" value={id}/>
-                <input name="product_name" placeholder="Name of product"/>
-                <input name="product_slug" placeholder="Slug"/>
-                <br/>
-                <input name="product_price" type="number" step="0.01" placeholder="Price"/>
-                <br/>
-                Picture: <input type="file" name="product_img"/>
-                <br/>
-                <textarea name="product_description" placeholder="Description"></textarea>
-                <button type="submit">Add new product</button>
-            </form>
 
+        <div key="products-box">
+            {
+                products.map(p =>
+                    <div key={p.id} className="shop-product"
+                         onClick={() => dispatch({type: "navigate", payload: "product/" + (p.slug || p.id)})}>
+                        <b>{p.name}</b>
+                        <picture>
+                            <img src={"file/" + p.imageUrl} alt="prod"/>
+                        </picture>
+                        <p><strong>{p.price}</strong> <small>{p.description}</small></p>
+                    </div>)
+            }
+        </div>
+
+        {state.auth.token && state.auth.user && state.auth.user_role.name === "admin" && state.auth.user_role.canCreate &&
+            <div>
+                <b onClick={() => dispatch({type: "navigate", payload: "home"})}>Go back</b>
+
+                <form id="productForm" onSubmit={addProduct} encType="multipart/form-data">
+                    <hr/>
+                    <input type="hidden" name="product_category" value={id}/>
+                    <input name="product_name" placeholder="Name of product"/>
+                    <input name="product_slug" placeholder="Slug"/>
+                    <br/>
+                    <input name="product_price" type="number" step="0.01" placeholder="Price"/>
+                    <br/>
+                    Picture: <input type="file" name="product_img"/>
+                    <br/>
+                    <textarea name="product_description" placeholder="Description"></textarea>
+                    <button type="submit">Add new product</button>
+                </form>
+            </div>
         }
+
+
     </div>
 }
 
 function Shop() {
-    const addCategory = React.useCallback( (e) => {
+    const addCategory = React.useCallback((e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         fetch("shop/category", {
@@ -251,8 +398,6 @@ function Shop() {
     </React.Fragment>;
 }
 
-
 const root = ReactDOM.createRoot(document.getElementById("spa-container"));
-root.render(
-    <Spa/>
-);
+root.render(<Spa/>);
+

@@ -4,6 +4,9 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import itstep.learning.dal.dao.shop.ProductDao;
 import itstep.learning.dal.dto.shop.Product;
+import itstep.learning.rest.RestMetaData;
+import itstep.learning.rest.RestResponse;
+import itstep.learning.rest.RestResponseStatus;
 import itstep.learning.rest.RestService;
 import itstep.learning.services.files.FileService;
 import itstep.learning.services.formparse.FormParseResult;
@@ -12,11 +15,16 @@ import org.apache.commons.fileupload.FileItem;
 
 import javax.inject.Named;
 import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Singleton
@@ -26,6 +34,7 @@ public class ProductServlet extends HttpServlet {
     private final FormParseService formParseService;
     private final FileService fileService;
     private final ProductDao productDao;
+    private RestResponse restResponse;
 
     @Inject
     public ProductServlet(RestService restService, @Named("formParse") FormParseService formParseService, FileService fileService
@@ -34,6 +43,45 @@ public class ProductServlet extends HttpServlet {
         this.formParseService = formParseService;
         this.fileService = fileService;
         this.productDao = productDao;
+    }
+
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        restResponse = new RestResponse();
+        restResponse.setMeta(
+                new RestMetaData()
+                        .setUri("/shop/products")
+                        .setMethod(req.getMethod())
+                        .setLocale("uk-UA")
+                        .setServerTime(new Date())
+                        .setName("Product API")
+                        .setAcceptMethods(new String[]{"GET", "POST"})
+        );
+        super.service(req, resp);
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String productId = req.getParameter("id");
+        if (productId != null) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("id", productId);
+            this.restResponse.getMeta().setParams(params);
+            getProductById(productId, req, resp);
+            return;
+        }
+
+
+        String categoryId = req.getParameter("categoryId");
+        if (categoryId != null) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("categoryId", categoryId);
+            this.restResponse.getMeta().setParams(params);
+            getProductByCategoryId(categoryId, req, resp);
+            return;
+        }
+
+        restService.setRestResponse(resp, restResponse.setData("Missing one of the required parameters: 'id' or 'categoryId'"));
     }
 
     @Override
@@ -61,10 +109,16 @@ public class ProductServlet extends HttpServlet {
         Product product = new Product();
         FormParseResult res = formParseService.parse(request);
 
-        product.setSlug(res.getFields().get("product_slug"));
-        if(product.getSlug() != null && !product.getSlug().isEmpty() && !productDao.isSlugFree(product.getSlug())){
-            throw new Exception("product_slug-Slug already used");
+        String slug = res.getFields().get("product_slug");
+        if(slug != null && !slug.isEmpty()) {
+            slug = slug.trim();
+            if(slug.isEmpty() || !productDao.isSlugFree(slug)){
+                throw new Exception("product_slug-Slug: " + slug + " already used");
+            }
+            product.setSlug(slug);
         }
+
+
 
         try {
             product.setCategoryId(UUID.fromString(res.getFields().get("product_category")));
@@ -104,5 +158,30 @@ public class ProductServlet extends HttpServlet {
         return product;
     }
 
+    private void getProductByCategoryId(String categoryId, HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        UUID categoryUuid;
+        try { categoryUuid = UUID.fromString(categoryId);  }
+        catch (IllegalArgumentException ignored) {
+            restService.sendRestError(resp, "categoryId-Invalid");
+            return;
+        }
+        restService.setRestResponse(resp, restResponse.setData(productDao.getAll(categoryUuid)));
+    }
 
+    private void getProductById(String productId, HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        Product product = productDao.getProductByIdOrSlug( productId );
+        if( product != null ) {
+            restService.sendRest( resp,
+                    restResponse
+                            .setStatus( 200  )
+                            .setData( product )
+            );
+        }
+        else {
+            restService.sendRest( resp,
+                    restResponse
+                            .setStatus( 404 )
+                            .setData( "Product not found: " + productId ) );
+        }
+    }
 }

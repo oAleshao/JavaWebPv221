@@ -15,7 +15,7 @@ document.addEventListener("submit", e =>{
        fetch(`${form.action}?${queryString}`, {
            method: "PATCH",
        }).then(r=>r.json()).then( j=>{
-           if(j.status === "OK"){
+           if(j.status.phrase === "OK"){
                window.location.reload();
            }
            else {

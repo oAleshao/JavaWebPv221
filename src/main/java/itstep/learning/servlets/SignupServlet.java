@@ -8,6 +8,7 @@ import itstep.learning.dal.dao.UserDao;
 import itstep.learning.dal.dto.User;
 import itstep.learning.models.formmodels.SignupModel;
 import itstep.learning.rest.RestResponse;
+import itstep.learning.rest.RestService;
 import itstep.learning.services.files.FileService;
 import itstep.learning.services.formparse.FormParseResult;
 import itstep.learning.services.formparse.FormParseService;
@@ -33,13 +34,15 @@ public class SignupServlet extends HttpServlet {
     private final FileService fileService;
     private final UserDao userDao;
     private final Logger logger;
+    private final RestService restService;
 
     @Inject
-    public SignupServlet(@Named("formParse") FormParseService formParseService, FileService fileService, UserDao userDao, Logger logger) {
+    public SignupServlet(@Named("formParse") FormParseService formParseService, FileService fileService, UserDao userDao, Logger logger, RestService restService) {
         this.formParseService = formParseService;
         this.fileService = fileService;
         this.userDao = userDao;
         this.logger = logger;
+        this.restService = restService;
     }
 
     @Override
@@ -62,29 +65,28 @@ public class SignupServlet extends HttpServlet {
         Gson gson = new GsonBuilder().serializeNulls().create();
 
         if (userLogin == null || userLogin.isEmpty() || userPassword == null || userPassword.isEmpty()) {
-            restResponse.setStatus("Error");
-            restResponse.setData("Missing or empty credentials");
-            resp.getWriter().write(gson.toJson(restResponse));
+
+            restService.sendRestError(resp, "Missing or empty credentials", 401);
             return;
         }
 
-        User user = userDao.authenticate(userLogin, userPassword);
-        if (user == null) {
-            restResponse.setStatus("Error");
-            restResponse.setData("Invalid credentials");
-            resp.getWriter().write(gson.toJson(restResponse));
-            return;
+        try {
+            User user = userDao.authenticate(userLogin, userPassword);
+            if (user == null) {
+                restService.sendRestError(resp, "Invalid credentials", 401);
+                return;
+            }
+            // утримання авторизації - сесія
+            // зберігаємо у сесія відомості про користувача
+            HttpSession session = req.getSession();
+            session.setAttribute("userId", user.getId());
+
+            restService.setRestResponse(resp, user);
+        }catch (Exception e) {
+            restService.sendRestError(resp, e.getMessage(), 500);
         }
 
 
-        // утримання авторизації - сесія
-        // зберігаємо у сесія відомості про користувача
-        HttpSession session = req.getSession();
-        session.setAttribute("userId", user.getId());
-
-        restResponse.setStatus("OK");
-        restResponse.setData(user);
-        resp.getWriter().print(gson.toJson(restResponse));
 
 
     }
@@ -105,25 +107,17 @@ public class SignupServlet extends HttpServlet {
         try {
             model = getModelFromRequest(req);
         } catch (Exception ex) {
-            restResponse.setStatus("Error");
-            restResponse.setData(ex.getMessage());
+            restService.sendRestError(resp, ex.getMessage(), 401);
             resp.getWriter().print(new Gson().toJson(restResponse));
             return;
         }
 
         User user = userDao.signup(model);
         if (user == null) {
-            restResponse.setStatus("Error");
-            restResponse.setData("500 DB Error, details on server logs");
-            resp.getWriter().print(new Gson().toJson(restResponse));
+            restService.sendRestError(resp, "DB Error, details on server logs", 500);
             return;
         }
-
-        restResponse.setStatus("Ok");
-        restResponse.setData(model);
-
-        resp.getWriter().print(new Gson().toJson(restResponse));
-
+        restService.setRestResponse(resp, model);
     }
 
     private SignupModel getModelFromRequest(HttpServletRequest request) throws Exception {

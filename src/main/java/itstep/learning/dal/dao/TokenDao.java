@@ -34,6 +34,7 @@ public class TokenDao {
                 if(token.getExp().before(new Date())) {
                     throw new Exception("Token expired");
                 }
+                updateToken(token);
                 return new User(rs);
             }
             else {
@@ -43,6 +44,18 @@ public class TokenDao {
             logger.log(Level.WARNING, ex.getMessage(), ex);
             throw new Exception("Server error. Details on server logs");
         }
+    }
+
+    public void updateToken(Token token) throws Exception {
+        String sql = "UPDATE tokens set exp = ? WHERE token_id = ?";
+        try(PreparedStatement prop = connection.prepareStatement(sql)){
+            prop.setTimestamp(1, new Timestamp(token.getExp().getTime() + 1000 * 1800 * 3 ));
+            prop.setString(2, token.getTokenId().toString());
+            prop.executeUpdate();
+        }catch (SQLException ex){
+            logger.log(Level.WARNING, ex.getMessage(), ex);
+        }
+
     }
 
 

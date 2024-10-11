@@ -15,6 +15,8 @@ public class User {
     private Date birthday;
     private Date signupDt;
     private Date deleteDt;
+    private String role;
+    private String roleId;
 
     public User() {}
 
@@ -27,6 +29,8 @@ public class User {
         setEmail(res.getString("email"));
         setAvatar(res.getString("avatar"));
         setBirthday(res.getDate("birthday"));
+        setRole(res.getString("role"));
+        setRoleId(res.getString("role_id"));
         setSignupDt(new Date(res.getTimestamp("signup_dt").getTime()));
         Timestamp timestamp = res.getTimestamp("delete_dt");
         if (timestamp != null) {
@@ -89,6 +93,22 @@ public class User {
 
     public void setDeleteDt(Date deleteDt) {
         this.deleteDt = deleteDt;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public String getRoleId() {
+        return roleId;
+    }
+
+    public void setRoleId(String roleId) {
+        this.roleId = roleId;
     }
 }
 
