@@ -2,53 +2,51 @@ package itstep.learning.servlets.shop;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import itstep.learning.dal.dao.shop.CategoryDao;
 import itstep.learning.dal.dao.shop.ProductDao;
+import itstep.learning.dal.dto.shop.Category;
 import itstep.learning.dal.dto.shop.Product;
-import itstep.learning.rest.RestMetaData;
-import itstep.learning.rest.RestResponse;
-import itstep.learning.rest.RestResponseStatus;
-import itstep.learning.rest.RestService;
+import itstep.learning.rest.*;
+import itstep.learning.services.cacheMaster.CacheMaster;
 import itstep.learning.services.files.FileService;
 import itstep.learning.services.formparse.FormParseResult;
 import itstep.learning.services.formparse.FormParseService;
+import itstep.learning.services.stream.StringReader;
 import org.apache.commons.fileupload.FileItem;
 
 import javax.inject.Named;
 import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Singleton
-public class ProductServlet extends HttpServlet {
+public class ProductServlet extends RestServlet {
 
-    private final RestService restService;
     private final FormParseService formParseService;
     private final FileService fileService;
     private final ProductDao productDao;
-    private RestResponse restResponse;
+    private final CategoryDao categoryDao;
+    private final CacheMaster cacheMaster;
+    private int maxAge;
 
     @Inject
-    public ProductServlet(RestService restService, @Named("formParse") FormParseService formParseService, FileService fileService
-    , ProductDao productDao) {
-        this.restService = restService;
+    public ProductServlet(@Named("formParse") FormParseService formParseService, FileService fileService
+            , ProductDao productDao, CategoryDao categoryDao, CacheMaster cacheMaster) {
         this.formParseService = formParseService;
         this.fileService = fileService;
         this.productDao = productDao;
+        this.categoryDao = categoryDao;
+        this.cacheMaster = cacheMaster;
     }
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        restResponse = new RestResponse();
-        restResponse.setMeta(
+        super.restResponse = new RestResponse();
+        super.restResponse.setMeta(
                 new RestMetaData()
                         .setUri("/shop/products")
                         .setMethod(req.getMethod())
@@ -62,6 +60,9 @@ public class ProductServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+        this.maxAge = cacheMaster.getMaxAge("product");
+
         String productId = req.getParameter("id");
         if (productId != null) {
             Map<String, Object> params = new HashMap<>();
@@ -81,27 +82,26 @@ public class ProductServlet extends HttpServlet {
             return;
         }
 
-        restService.setRestResponse(resp, restResponse.setData("Missing one of the required parameters: 'id' or 'categoryId'"));
+        super.sendRest(400, "Missing one of the required parameters: 'id' or 'categoryId'");
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         if (req.getAttribute("Claims.Sid") == null) {
-            restService.sendRestError(resp, "Unauthorized. Token empty or rejected");
+            super.sendRest(401, "Unauthorized. Token empty or rejected");
             return;
         }
 
         try {
             Product product = getModelFromRequest(req);
             product = productDao.add(product);
-            if(product == null) {
-                restService.sendRestError(resp, "Something went wrong. Check server logs");
+            if (product == null) {
+                super.sendRest(500, "Something went wrong. Check server logs");
+            } else {
+                super.sendRest(200, product);
             }
-            else {
-                restService.setRestResponse(resp, product);
-            }
-        }catch (Exception ex){
-            restService.sendRestError(resp, ex.getMessage());
+        } catch (Exception ex) {
+            super.sendRest(422, ex.getMessage());
         }
     }
 
@@ -110,25 +110,25 @@ public class ProductServlet extends HttpServlet {
         FormParseResult res = formParseService.parse(request);
 
         String slug = res.getFields().get("product_slug");
-        if(slug != null && !slug.isEmpty()) {
+        if (slug != null && !slug.isEmpty()) {
             slug = slug.trim();
-            if(slug.isEmpty() || !productDao.isSlugFree(slug)){
+            if (slug.isEmpty() || !productDao.isSlugFree(slug)) {
                 throw new Exception("product_slug-Slug: " + slug + " already used");
             }
             product.setSlug(slug);
         }
 
 
-
-        try {
-            product.setCategoryId(UUID.fromString(res.getFields().get("product_category")));
-        }catch (IllegalArgumentException ignored){
+        String categoryId = res.getFields().get("product_category");
+        Category category = categoryDao.getProductByIdOrSlug(categoryId);
+        if (category == null) {
             throw new Exception("product_category-Missing or empty or incorrect required field");
         }
+        product.setCategoryId(category.getId());
 
         try {
             product.setPrice(Double.parseDouble(res.getFields().get("product_price")));
-        }catch (IllegalArgumentException ignored){
+        } catch (IllegalArgumentException ignored) {
             throw new Exception("product_price-Price is required");
         }
 
@@ -147,11 +147,10 @@ public class ProductServlet extends HttpServlet {
         if (avatar.getSize() > 0) {
             try {
                 product.setImageUrl(fileService.upload(avatar));
-            }catch (Exception ignored){
+            } catch (Exception ignored) {
                 throw new Exception("product_img-You can add only .png .jpg .svg");
             }
-        }
-        else {
+        } else {
             throw new Exception("product_img-Avatar is required");
         }
 
@@ -159,29 +158,20 @@ public class ProductServlet extends HttpServlet {
     }
 
     private void getProductByCategoryId(String categoryId, HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        UUID categoryUuid;
-        try { categoryUuid = UUID.fromString(categoryId);  }
-        catch (IllegalArgumentException ignored) {
-            restService.sendRestError(resp, "categoryId-Invalid");
+        Category category = categoryDao.getProductByIdOrSlug(categoryId);
+        if (category == null) {
+            super.sendRest(404, "categoryId-Invalid");
             return;
         }
-        restService.setRestResponse(resp, restResponse.setData(productDao.getAll(categoryUuid)));
+        super.sendRest(200, productDao.getAll(category.getId()), this.maxAge);
     }
 
     private void getProductById(String productId, HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        Product product = productDao.getProductByIdOrSlug( productId );
-        if( product != null ) {
-            restService.sendRest( resp,
-                    restResponse
-                            .setStatus( 200  )
-                            .setData( product )
-            );
-        }
-        else {
-            restService.sendRest( resp,
-                    restResponse
-                            .setStatus( 404 )
-                            .setData( "Product not found: " + productId ) );
+        Product product = productDao.getProductByIdOrSlug(productId);
+        if (product != null) {
+            super.sendRest(200, product, this.maxAge);
+        } else {
+            super.sendRest(404, "Product not found: " + productId);
         }
     }
 }

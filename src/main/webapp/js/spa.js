@@ -1,4 +1,41 @@
-﻿const initialState = {
+﻿const env = {
+    apiHost: "http://localhost:8080/Java221"
+};
+
+async function request(url, params) {
+
+    if (url.startsWith('/')) {
+        url = env.apiHost + url;
+    }
+
+    // if (typeof params.headers == "undefined") {
+    //     params = {
+    //         ...params,
+    //         headers:{
+    //             Authorization: "Bearer " +
+    //         }
+    //     }
+    // } else if (typeof params.headers.Authorization == "undefined") {
+    //
+    // }
+
+    return new Promise((resolve, reject) => {
+        fetch(url, params)
+            .then(r => r.json())
+            .then(j => {
+                if (j.status.isSuccessful) {
+                    resolve(j.data);
+                } else {
+                    reject(j.data);
+                }
+            });
+    });
+
+
+}
+
+
+const initialState = {
     page: "home",
     auth: {
         token: null,
@@ -7,7 +44,8 @@
     },
     shop: {
         categories: []
-    }
+    },
+    cart: []
 }
 
 function reducer(state, action) {
@@ -50,6 +88,11 @@ function reducer(state, action) {
                     categories: action.payload
                 }
             }
+        case "setCart":
+            return {
+                ...state,
+                cart: action.payload
+            }
         default:
             throw new Error("unkonwn action");
     }
@@ -68,7 +111,7 @@ function Spa() {
 
     const loginChange = React.useCallback((e) => setLogin(e.target.value));
     const passwordChange = React.useCallback((e) => setPassword(e.target.value));
-    const getUser = function (tokenId) {
+    const getUser = React.useCallback((tokenId) => {
         fetch('auth', {
             method: "GET",
             headers: {
@@ -77,11 +120,12 @@ function Spa() {
         })
             .then(r => r.json())
             .then(j => {
+                window.sessionStorage.setItem("user_pv221", JSON.stringify(j.data));
                 dispatch({type: "updateUser", payload: j.data})
                 getUserRole(j.data.roleId);
             })
-    };
-    const getUserRole = function (roleId){
+    });
+    const getUserRole = React.useCallback((roleId) => {
         fetch('auth', {
             method: "GET",
             headers: {
@@ -90,10 +134,10 @@ function Spa() {
         })
             .then(r => r.json())
             .then(j => {
+                window.sessionStorage.setItem("userRole_pv221", JSON.stringify(j.data));
                 dispatch({type: "setUserRole", payload: j.data})
-                console.log(j.data);
             })
-    }
+    });
     const authClick = React.useCallback(() => {
         const credentials = btoa(login + ":" + password);
         fetch(`auth`, {
@@ -102,7 +146,7 @@ function Spa() {
                 'Authorization': 'Basic ' + credentials
             }
         }).then(r => r.json()).then(j => {
-                if (j.status.phrase === "OK") {
+                if (j.status.isSuccessful) {
                     window.sessionStorage.setItem("token_pv221", JSON.stringify(j.data));
                     getUser(j.data.tokenId);
                     setAuth(true);
@@ -141,14 +185,14 @@ function Spa() {
     const userLogOut = React.useCallback(() => {
         document.querySelector("div.helper-box-exit").classList.toggle("nonactiveBox");
     });
-    const checkToken = React.useCallback(() => {
+    const checkToken = React.useCallback((forceAuth) => {
         let token = window.sessionStorage.getItem("token_pv221");
         if (token) {
             token = JSON.parse(token);
             if (new Date(token.exp) < new Date()) {
                 exitClick();
             } else {
-                if (!isAuth) {
+                if (forceAuth) {
                     setAuth(true);
                     dispatch({type: "auth", payload: token})
                 }
@@ -167,17 +211,29 @@ function Spa() {
             dispatch({type: "navigate", payload: hash.substring(1)});
         }
     })
+    const loadCart = React.useCallback(() => {
+        request("/shop/cart", {
+            headers: {
+                Authorization: "Bearer " + state.auth.token.tokenId,
+                "Content-Type": "application/json"
+            },
+        }).then(data => dispatch({type: "setCart", payload: data}))
+            .catch(console.log)
+    });
 
     React.useEffect(() => {
         hashWindow();
         window.addEventListener("hashchange", hashWindow)
-        checkToken();
+        checkToken(true);
         let token = window.sessionStorage.getItem("token_pv221");
         if (token) {
             token = JSON.parse(token);
             getUser(token.tokenId);
         }
-        const interval = setInterval(checkToken, 1000);
+
+        const interval = setInterval(() => {
+            checkToken(false)
+        }, 1000);
 
         if (state.shop.categories.length === 0) {
             fetch("shop/category")
@@ -190,9 +246,15 @@ function Spa() {
             window.removeEventListener('hashchange', hashWindow);
         }
     }, []);
+    React.useEffect(() => {
+        if (state.auth.token != null) {
+            loadCart();
+        } else {
+            dispatch({type: "setCart", payload: []})
+        }
+    }, [state.auth])
 
-
-    return (<StateContext.Provider value={{state, dispatch}}>
+    return (<StateContext.Provider value={{state, dispatch, loadCart}}>
         <h1>Spa</h1>
         {!isAuth &&
             <div>
@@ -224,19 +286,27 @@ function Spa() {
                         </div>
                     }
                 </div>
+
                 <b key={"btnHome"} onClick={() => {
                     navigate('home')
-                }}>Home</b>
+                }}>Home</b>&emsp;
 
-                {state.auth.user && state.auth.user_role.name === "admin" && state.auth.user_role.canCreate &&
+                {state.auth.user && state.auth.user_role && state.auth.user_role.canCreate &&
                     <b key={"btnShop"} onClick={() => {
                         navigate('shop')
                     }}>Shop</b>
-                }
+                }&emsp;
+
+                <b onClick={() => {
+                    navigate('cart')
+                }}>Cart({state.cart.reduce((cnt, c) => cnt + c.quantity, 0)} ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)})</b>&emsp;
+
+
 
                 {state.page === "home" && <Home key={"UNIQUE HOME"}/>}
-                {state.page === "shop" && state.auth.user && state.auth.user_role.name === "admin" && state.auth.user_role.canCreate &&
+                {state.page === "shop" && state.auth.user_role && state.auth.user_role.canCreate &&
                     <Shop key={"UNIQUE SHOP"}/>}
+                {state.page === "cart" && <Cart/>}
                 {state.page.startsWith('category/') && <Category id={state.page.substring(9)}/>
                 }
                 {
@@ -252,39 +322,58 @@ function Home() {
     return <React.Fragment>
         <h2>Home</h2>
         <b onClick={() => dispatch({type: "navigate", payload: "shop"})}>Log in as admin</b>
-        <CategoriesList/>
+        <CategoriesList mode={"table"}/>
     </React.Fragment>
 }
 
-function CategoriesList() {
+function CategoriesList({mode}) {
     const {state, dispatch} = React.useContext(StateContext);
     return <React.Fragment>
-        <div>
-            {state.shop.categories.map(c =>
-                <div className="shop-category" key={c.id}
-                     onClick={() => dispatch({type: "navigate", payload: "category/" + c.id})}>
-                    <b>{c.name}</b>
-                    <img src={"file/" + c.imageUrl} alt={c.name}/>
-                    <p>{c.description}</p>
-                </div>)
-            }
-        </div>
+        {mode === "table" &&
+            <div>
+                {state.shop.categories.map(c =>
+                    <div className="shop-category" key={c.id}
+                         onClick={() => dispatch({type: "navigate", payload: "category/" + (c.slug || c.id)})}>
+                        <b>{c.name}</b>
+                        <img src={"file/" + c.imageUrl} alt={c.name}/>
+                        <p>{c.description}</p>
+                    </div>)
+                }
+            </div>
+        }
+        {mode === "ribbon" &&
+            <div className={"category-ribbon"}>
+                <h4>More categories...</h4>
+                {state.shop.categories.map(c =>
+                    <div className="shop-category-ribbon-item" key={c.id} title={c.name}
+                         onClick={() => dispatch({type: "navigate", payload: "category/" + (c.slug || c.id)})}>
+                        <img src={"file/" + c.imageUrl} alt={c.name}/>
+                    </div>)
+                }
+            </div>
+        }
     </React.Fragment>
 }
 
 function Product({id}) {
     const [product, setProduct] = React.useState(null);
     React.useEffect(() => {
-        fetch("shop/product?id=" + id)
-            .then(r => r.json())
-            .then(j => {
-                if (j.status === "OK") {
-                    setProduct(j.data);
-                } else {
-                    console.log(j.data);
-                    setProduct(null);
-                }
+        request(`/shop/product?id=${id}`)
+            .then(setProduct)
+            .catch(error => {
+                console.error(error);
+                setProduct(null);
             })
+        // fetch("shop/product?id=" + id)
+        //     .then(r => r.json())
+        //     .then(j => {
+        //         if (j.status.isSuccessful) {
+        //             setProduct(j.data);
+        //         } else {
+        //             console.log(j.data);
+        //             setProduct(null);
+        //         }
+        //     })
     }, [id]);
     return <div>
         <h1>Page of product</h1>
@@ -297,13 +386,13 @@ function Product({id}) {
         </div>
         }
 
-        <CategoriesList/>
+        <CategoriesList mode={"ribbon"}/>
     </div>
 }
 
 function Category({id}) {
-    const {state, dispatch} = React.useContext(StateContext);
-    const [products, setProducts] = React.useState([]);
+    const {state, dispatch, loadCart} = React.useContext(StateContext);
+    const [products, setProducts] = React.useState(null);
     const addProduct = React.useCallback((e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -314,7 +403,7 @@ function Category({id}) {
             },
             body: formData
         }).then(r => r.json()).then(j => {
-            if (j.status === "OK") {
+            if (j.status.isSuccessful) {
                 loadProducts();
                 document.getElementById("productForm").reset();
             } else {
@@ -323,54 +412,93 @@ function Category({id}) {
         });
     });
     const loadProducts = React.useCallback(() => {
-        fetch("shop/product?categoryId=" + id)
-            .then(r => r.json())
-            .then(j => {
-                setProducts(j.data.data);
+        request(`shop/product?categoryId=${id}`)
+            .then(setProducts)
+            .catch(error => {
+                console.error(error);
+                setProducts(null);
             })
+    });
+    const addProductToCart = React.useCallback((id) => {
+        console.log(id);
+        const userId = state.auth.token.userId;
+
+        request("/shop/cart", {
+            method: "POST",
+            headers: {
+                Authorization: "Bearer " + state.auth.token.tokenId,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                userId: userId,
+                productId: id,
+                quantity: 1
+            })
+        }).then(() => loadCart())
+            .catch(console.log)
+
+
     });
     React.useEffect(() => {
         loadProducts();
-    }, []);
+    }, [id]);
 
     return <div>
-        Category: {id}<br/>
+        {products && <div>
+            Category: {id}<br/>
 
-        <div key="products-box">
-            {
-                products.map(p =>
-                    <div key={p.id} className="shop-product"
-                         onClick={() => dispatch({type: "navigate", payload: "product/" + (p.slug || p.id)})}>
-                        <b>{p.name}</b>
-                        <picture>
-                            <img src={"file/" + p.imageUrl} alt="prod"/>
-                        </picture>
-                        <p><strong>{p.price}</strong> <small>{p.description}</small></p>
-                    </div>)
+            <div key="products-box">
+                {
+                    products.map(p =>
+                        <div key={p.id} className="shop-product"
+                             onClick={() => dispatch({type: "navigate", payload: "product/" + (p.slug || p.id)})}>
+                            <b>{p.name}</b>
+                            <picture>
+                                <img src={"file/" + p.imageUrl} alt="prod"/>
+                            </picture>
+                            <div className={"row"}>
+                                <div className={"col s9"}>
+                                    <strong>{p.price}</strong> <small>{p.description}</small>
+
+                                </div>
+                                <div className={"col s3"}>
+                                    <a className="btn-floating cart-fab waves-effect waves-light red"
+                                       title={"add to cart"}
+                                       onClick={(e) => {
+                                           e.stopPropagation();
+                                           addProductToCart(p.id)
+                                       }}><i
+                                        className="material-icons">add</i></a>
+                                </div>
+                            </div>
+
+                        </div>)
+                }
+            </div>
+
+
+            {state.auth.user_role && state.auth.user_role.canCreate &&
+                <div>
+                    <b onClick={() => dispatch({type: "navigate", payload: "home"})}>Go back</b>
+
+                    <form id="productForm" onSubmit={addProduct} encType="multipart/form-data">
+                        <hr/>
+                        <input type="hidden" name="product_category" value={id}/>
+                        <input name="product_name" placeholder="Name of product"/>
+                        <input name="product_slug" placeholder="Slug"/>
+                        <br/>
+                        <input name="product_price" type="number" step="0.01" placeholder="Price"/>
+                        <br/>
+                        Picture: <input type="file" name="product_img"/>
+                        <br/>
+                        <textarea name="product_description" placeholder="Description"></textarea>
+                        <button type="submit">Add new product</button>
+                    </form>
+                </div>
             }
         </div>
-
-        {state.auth.token && state.auth.user && state.auth.user_role.name === "admin" && state.auth.user_role.canCreate &&
-            <div>
-                <b onClick={() => dispatch({type: "navigate", payload: "home"})}>Go back</b>
-
-                <form id="productForm" onSubmit={addProduct} encType="multipart/form-data">
-                    <hr/>
-                    <input type="hidden" name="product_category" value={id}/>
-                    <input name="product_name" placeholder="Name of product"/>
-                    <input name="product_slug" placeholder="Slug"/>
-                    <br/>
-                    <input name="product_price" type="number" step="0.01" placeholder="Price"/>
-                    <br/>
-                    Picture: <input type="file" name="product_img"/>
-                    <br/>
-                    <textarea name="product_description" placeholder="Description"></textarea>
-                    <button type="submit">Add new product</button>
-                </form>
-            </div>
         }
-
-
+        {!products && <div>Not founded category</div>}
     </div>
 }
 
@@ -398,6 +526,74 @@ function Shop() {
     </React.Fragment>;
 }
 
+function Cart() {
+    const {state, dispatch, loadCart} = React.useContext(StateContext);
+    const changeQuantity = React.useCallback((cartItem, action) => {
+        switch (action) {
+            case "inc":
+                console.log(cartItem, action);
+                break;
+            case "dec":
+                console.log(cartItem, action);
+                break;
+            case "del":
+                console.log(cartItem, action);
+                break;
+        }
+        loadCart();
+    });
+    return <React.Fragment>
+        <h1>Cart</h1>
+        {state.cart.length > 0 && <div>
+            <div className={"cart-box"}>
+                {
+                    state.cart.map(c =>
+                        <div key={c.productId} className={"cart-item"}>
+                            <div className={"cart-img-box"}>
+                                <img src={"file/" + c.product.imageUrl} alt={c.productId + "_img"}/>
+                            </div>
+                            <div className={"cart-item-info"}>
+                                <div className={"product-name"}>{c.product.name}</div>
+                                <div className={"counter-box"}>
+                                    <section className={"quantity-box"}>
+                                        <div>
+                                            <button>-</button>
+                                        </div>
+                                        <div>
+                                            {c.quantity}
+                                        </div>
+                                        <div>
+                                            <button>+</button>
+                                        </div>
+                                    </section>
+                                    <section className={"price-box"}>
+                                        ${c.product.price * c.quantity}
+                                    </section>
+                                </div>
+                                <div className={"remove-box"}>
+                                    <button>
+                                        <i className="material-symbols-outlined">Remove</i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>)
+                }
+            </div>
+            <hr/>
+            <div className={"total-price-box"}>
+                Total amount: ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)}
+            </div>
+        </div>
+        }
+        {state.cart.length < 1 &&
+            <div className={"empty-cart"}>
+                Your cart is empty):
+                <br/>
+                You can fix it!!!
+            </div>
+        }
+    </React.Fragment>
+}
+
 const root = ReactDOM.createRoot(document.getElementById("spa-container"));
 root.render(<Spa/>);
-

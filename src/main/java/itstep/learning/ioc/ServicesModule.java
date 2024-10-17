@@ -2,6 +2,8 @@ package itstep.learning.ioc;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.name.Names;
+import itstep.learning.services.cacheMaster.CacheMaster;
+import itstep.learning.services.cacheMaster.CacheMasterService;
 import itstep.learning.services.files.FileService;
 import itstep.learning.services.files.LocalFileService;
 import itstep.learning.services.formparse.FormParseService;
@@ -32,6 +34,8 @@ public class ServicesModule extends AbstractModule {
         bind( FormParseService.class )
                 .annotatedWith( Names.named("formParse") )
                 .to( MixedFormParseService.class ) ;
+
+        bind(CacheMaster.class).to(CacheMasterService.class);
 
         bind(StringReader.class).toInstance(reader); ;
 

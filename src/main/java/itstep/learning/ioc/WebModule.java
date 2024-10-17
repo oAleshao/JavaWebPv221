@@ -25,5 +25,6 @@ public class WebModule extends ServletModule {
 
         serve("/shop/category").with(CategoryServlet.class);
         serve("/shop/product").with(ProductServlet.class);
+        serve("/shop/cart").with(CartServlet.class);
     }
 }

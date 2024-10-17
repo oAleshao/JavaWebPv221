@@ -5,6 +5,7 @@ import com.google.inject.Singleton;
 import itstep.learning.dal.dao.RoleDao;
 import itstep.learning.dal.dao.TokenDao;
 import itstep.learning.dal.dao.UserDao;
+import itstep.learning.dal.dao.shop.CartDao;
 import itstep.learning.dal.dao.shop.CategoryDao;
 import itstep.learning.dal.dao.shop.ProductDao;
 import itstep.learning.dal.dto.Role;
@@ -32,6 +33,7 @@ public class HomeServlet extends HttpServlet {
     private final CategoryDao categoryDao;
     private final ProductDao productDao;
     private final RoleDao roleDao;
+    private final CartDao cartDao;
 
     @Inject
     public HomeServlet(@Named("digest") HashService digest,
@@ -40,7 +42,8 @@ public class HomeServlet extends HttpServlet {
                        TokenDao tokenDao,
                        CategoryDao categoryDao,
                        ProductDao productDao,
-                       RoleDao roleDao) {
+                       RoleDao roleDao,
+                       CartDao cartDao) {
         this.digest = digest;
         this.signature = signature;
         this.tokenDao = tokenDao;
@@ -48,7 +51,7 @@ public class HomeServlet extends HttpServlet {
         this.categoryDao = categoryDao;
         this.productDao = productDao;
         this.roleDao = roleDao;
-
+        this.cartDao = cartDao;
     }
 
     @Override
@@ -87,7 +90,7 @@ public class HomeServlet extends HttpServlet {
         }
 
 
-        req.setAttribute("hash", roleDao.installTables() && categoryDao.installTables() && productDao.installTables() ? "Tables OK" : "Tables NOT OK");
+        req.setAttribute("hash", cartDao.installTables() ? "Tables OK" : "Tables NOT OK");
         req.setAttribute("productList", new ProductList().getProductList());
         req.setAttribute("page", "home");
         req.getRequestDispatcher("WEB-INF/views/_layout.jsp").forward(req, resp);

@@ -130,7 +130,6 @@ body{
 }
 .shop-category picture,
 .shop-product picture {
-    background-color: lightgray;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -151,4 +150,125 @@ body{
     position: absolute;
     top: 0;
     right: 0;
+}
+
+.cart-fab {
+    width: 3vw !important;
+    height: 3vw !important;
+}
+
+.cart-fab i {
+    width: 2vw !important;
+    height: 2vw !important;
+    display: block;
+    margin: auto;
+    font-size: 2vw !important;
+    line-height: 3vw !important;
+}
+
+.category-ribbon h4{
+    font-size: 24px !important;
+}
+
+.shop-category-ribbon-item{
+   display: inline;
+    margin-inline: 16px;
+}
+
+.shop-category-ribbon-item img{
+    width: 80px;
+    height: 80px;
+    transition: 0.2s;
+}
+
+.shop-category-ribbon-item img:hover{
+    cursor: pointer;
+    width: 100px;
+    height: 100px;
+}
+
+/*///////
+    CART
+////*/
+
+.cart-box{
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.cart-item{
+    display: flex;
+    background: #00bcd4;
+    margin-block: 10px;
+    margin-inline: 16px;
+    border: 1px solid black;
+    border-radius: 0.25rem;
+    width: 45%;
+}
+.cart-img-box {
+    flex-basis: 30%;
+}
+
+.cart-img-box img{
+    width: 120px;
+    height: 120px;
+}
+
+.cart-item-info{
+    flex-basis: 70%;
+    position: relative;
+}
+
+.product-name{
+    padding-top: 20px;
+    padding-inline: 12px;
+    font-size: 24px;
+    color: white;
+}
+
+.remove-box{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+
+}
+
+.counter-box{
+    display: flex;
+}
+
+.quantity-box{
+    flex-basis: 60%;
+    display: flex;
+}
+
+.quantity-box div:nth-child(2n+1){
+    padding-inline: 12px;
+    padding-top: 20px;
+}
+
+.quantity-box div:nth-child(2){
+    color: white;
+    font-size: 18px;
+    padding-top: 18px;
+}
+
+.price-box{
+    flex-basis: 40%;
+    text-align: right;
+    padding-top: 18px;
+    font-size: 18px;
+    color: white;
+    padding-inline: 16px;
+}
+
+.total-price-box{
+    text-align: right;
+    font-size: 32px;
+    padding-inline: 16px;
+    margin-bottom: 50px;
+}
+
+.empty-cart{
+    font-size: 32px;
 }

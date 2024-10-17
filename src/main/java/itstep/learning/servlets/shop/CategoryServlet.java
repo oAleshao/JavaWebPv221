@@ -4,7 +4,10 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import itstep.learning.dal.dao.shop.CategoryDao;
 import itstep.learning.models.formmodels.CategoryModel;
-import itstep.learning.rest.RestService;
+import itstep.learning.rest.RestMetaData;
+import itstep.learning.rest.RestResponse;
+import itstep.learning.rest.RestServlet;
+import itstep.learning.services.cacheMaster.CacheMaster;
 import itstep.learning.services.files.FileService;
 import itstep.learning.services.formparse.FormParseResult;
 import itstep.learning.services.formparse.FormParseService;
@@ -12,29 +15,48 @@ import org.apache.commons.fileupload.FileItem;
 
 import javax.inject.Named;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Date;
 
 @Singleton
-public class CategoryServlet extends HttpServlet {
-    private final RestService restService;
+public class CategoryServlet extends RestServlet {
     private final FormParseService formParseService;
     private final FileService fileService;
     private final CategoryDao categoryDao;
+    private final CacheMaster cacheMaster;
+    private int maxAge;
 
     @Inject
-    public CategoryServlet(CategoryDao categoryDao, RestService restService, FileService fileService, @Named("formParse") FormParseService formParseService) {
+    public CategoryServlet(CategoryDao categoryDao, FileService fileService, @Named("formParse") FormParseService formParseService,
+                           CacheMaster cacheMaster) {
         this.categoryDao = categoryDao;
-        this.restService = restService;
         this.fileService = fileService;
         this.formParseService = formParseService;
+        this.cacheMaster = cacheMaster;
+    }
+
+    @Override
+    protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
+        super.restResponse = new RestResponse();
+        super.restResponse.setMeta(
+                new RestMetaData()
+                        .setUri("/shop/categories")
+                        .setMethod(req.getMethod())
+                        .setLocale("uk-UA")
+                        .setServerTime(new Date())
+                        .setName("Category API")
+                        .setAcceptMethods(new String[]{"GET", "POST"})
+        );
+        super.service(req, resp);
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        restService.setRestResponse(resp, categoryDao.getAll());
+        this.maxAge = cacheMaster.getMaxAge("category");
+        super.sendRest(200, categoryDao.getAll(), this.maxAge);
     }
 
     @Override
@@ -43,20 +65,20 @@ public class CategoryServlet extends HttpServlet {
 
         String slug = formParseResult.getFields().get("category_slug");
         if (slug != null && slug.isEmpty()) {
-            restService.sendRestError(resp, "category_slug-Slug already used");
+            super.sendRest(422, "category_slug-Slug already used");
             return;
         }
 
 
         String name = formParseResult.getFields().get("category_name");
         if (name == null || name.isEmpty()) {
-            restService.sendRestError(resp, "category_name-Name is required");
+            super.sendRest(422, "category_name-Name is required");
             return;
         }
 
         String description = formParseResult.getFields().get("category_description");
         if (description == null || description.isEmpty()) {
-            restService.sendRestError(resp, "category_description-Description is required");
+            super.sendRest(422, "category_description-Description is required");
             return;
         }
 
@@ -66,16 +88,16 @@ public class CategoryServlet extends HttpServlet {
             try {
                 uploadedName = fileService.upload(avatar);
             } catch (Exception e) {
-                restService.sendRestError(resp, e.getMessage());
+                super.sendRest(422, e.getMessage());
                 return;
             }
         } else {
-            restService.sendRestError(resp, "category_img-Image is required");
+            super.sendRest(422, "category_img-Image is required");
             return;
         }
 
 
-        restService.setRestResponse(resp,
+        super.sendRest(200,
                 categoryDao.add(new CategoryModel()
                         .setName(name)
                         .setDescription(description)

@@ -10,11 +10,10 @@ import itstep.learning.dal.dao.UserDao;
 import itstep.learning.dal.dto.Role;
 import itstep.learning.dal.dto.Token;
 import itstep.learning.dal.dto.User;
-import itstep.learning.rest.RestResponse;
-import itstep.learning.rest.RestService;
+import itstep.learning.rest.RestServlet;
+import itstep.learning.services.cacheMaster.CacheMaster;
 
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -23,20 +22,21 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 @Singleton
-public class AuthServlet extends HttpServlet {
+public class AuthServlet extends RestServlet {
     private final Logger logger;
     private final UserDao userDao;
     private final TokenDao tokenDao;
-    private final RestService restService;
     private final RoleDao roleDao;
+    private final CacheMaster cacheMaster;
+    int maxAge;
 
     @Inject
-    public AuthServlet(Logger logger, UserDao userDao, TokenDao tokenDao, RestService restService, RoleDao roleDao) {
+    public AuthServlet(Logger logger, UserDao userDao, TokenDao tokenDao, RoleDao roleDao, CacheMaster cacheMaster) {
         this.logger = logger;
         this.userDao = userDao;
         this.tokenDao = tokenDao;
-        this.restService = restService;
         this.roleDao = roleDao;
+        this.cacheMaster = cacheMaster;
     }
 
     @Override
@@ -45,7 +45,7 @@ public class AuthServlet extends HttpServlet {
         String authHeader = req.getHeader("Authorization");
 
         if (authHeader == null) {
-            sendRestError(resp, "Missing or empty credentials");
+            super.sendRest(401, "Missing or empty credentials");
             return;
         }
 
@@ -54,24 +54,27 @@ public class AuthServlet extends HttpServlet {
                 String tokenId = authHeader.substring("UserGet ".length());
                 try{
                     User user = tokenDao.getUserByToken(UUID.fromString(tokenId));
-                    setRestResponse(resp, user);
+                    super.sendRest(200, user);
                     return;
                 }catch (Exception e){
-                    sendRestError(resp, e.getMessage());
+                    super.sendRest(500, e.getMessage());
+                    return;
                 }
             }
             if(authHeader.startsWith("UserRoleGet ")) {
                 String roleId = authHeader.substring("UserRoleGet ".length());
                 try{
                     Role role = roleDao.getById(UUID.fromString(roleId));
-                    setRestResponse(resp, role);
+                    super.sendRest(200, role);
                     return;
                 }catch (Exception e){
-                    sendRestError(resp, e.getMessage());
+                    super.sendRest(500, e.getMessage());
+                    return;
                 }
             }
         }
 
+        this.maxAge = cacheMaster.getMaxAge("token");
         String credentials64 = authHeader.substring("Basic ".length());
         String credentials;
         try {
@@ -82,30 +85,16 @@ public class AuthServlet extends HttpServlet {
             String[] parts = credentials.split(":", 2);
             User user = userDao.authenticate(parts[0], parts[1]);
             if(user == null) {
-                sendRestError(resp, "Invalid login or password");
+                super.sendRest(401, "Invalid login or password");
                 return;
             }
 
             Token token = tokenDao.create(user);
-            setRestResponse(resp, token);
+            super.sendRest(200, token, this.maxAge);
         }catch (Exception e) {
             logger.warning(e.getMessage());
-            sendRestError(resp,e.getMessage());
+            super.sendRest(500,e.getMessage());
         }
     }
 
-
-    private void sendRestError(HttpServletResponse resp, String message) throws IOException {
-        restService.sendRestError(resp, message);
-    }
-
-    private void setRestResponse(HttpServletResponse resp, Object data) throws IOException {
-        restService.setRestResponse(resp, data);
-    }
-
-    private void sendRest(HttpServletResponse resp, RestResponse rest) throws IOException {
-        resp.setContentType("application/json");
-        Gson gson = new GsonBuilder().serializeNulls().create();
-        resp.getWriter().write(gson.toJson(rest));
-    }
 }

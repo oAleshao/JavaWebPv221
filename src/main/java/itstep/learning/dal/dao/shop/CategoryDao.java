@@ -2,14 +2,11 @@ package itstep.learning.dal.dao.shop;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import itstep.learning.dal.dto.User;
 import itstep.learning.dal.dto.shop.Category;
 import itstep.learning.models.formmodels.CategoryModel;
-import itstep.learning.models.formmodels.SignupModel;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -24,6 +21,31 @@ public class CategoryDao {
     public CategoryDao(Connection connection, Logger logger) {
         this.connection = connection;
         this.logger = logger;
+    }
+
+    public Category getProductByIdOrSlug(String id){
+        if(id == null || id.isEmpty()){
+            return null;
+        }
+        String sql = "SELECT * FROM categories WHERE ";
+        try {
+            UUID.fromString(id);
+            sql += "category_id = ?";
+
+        }catch (IllegalArgumentException ignored) {
+            sql += "category_slug = ?";
+        }
+
+        try(PreparedStatement prep = connection.prepareStatement(sql)){
+            prep.setString(1, id);
+            ResultSet rs = prep.executeQuery();
+            if(rs.next()) {
+                return new Category(rs);
+            }
+        }catch (SQLException ex) {
+            logger.log(Level.WARNING, ex.getMessage() + " -- " + sql , ex);
+        }
+        return null;
     }
 
     public List<Category> getAll() {
@@ -62,7 +84,8 @@ public class CategoryDao {
                 "image_url VARCHAR(512) NOT NULL," +
                 "description TEXT NOT NULL," +
                 "delete_dt DATETIME NULL," +
-                "category_slug VARCHAR(64) NULL" +
+                "category_slug VARCHAR(64) NULL," +
+                "UNIQUE(category_slug))" +
                 ") ENGINE=InnoDB, DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
         try (Statement stmt = connection.createStatement()) {

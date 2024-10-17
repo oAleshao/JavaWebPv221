@@ -31,6 +31,9 @@ public class ProductDao {
     }
 
     public Product getProductByIdOrSlug(String id) {
+        if(id == null || id.isEmpty()){
+            return null;
+        }
         String sql = "SELECT * FROM products WHERE ";
         try {
             UUID.fromString(id);
