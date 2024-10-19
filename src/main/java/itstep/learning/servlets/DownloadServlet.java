@@ -41,7 +41,7 @@ public class DownloadServlet extends HttpServlet {
                 outputStream.write(buffer, 0, length);
             }
         }catch (Exception ex){
-            logger.log(Level.WARNING, ex.getMessage(), ex);
+            logger.log(Level.WARNING, "WORKE HERE _____ " + ex.getMessage(), ex);
             resp.setStatus( 404 );
         }
     }

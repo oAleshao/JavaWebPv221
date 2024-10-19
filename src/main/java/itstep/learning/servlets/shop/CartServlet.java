@@ -2,6 +2,8 @@ package itstep.learning.servlets.shop;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.mysql.cj.xdevapi.DeleteStatement;
@@ -15,6 +17,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,7 +52,12 @@ public class CartServlet extends RestServlet {
                         .setName("Shop cart API")
                         .setAcceptMethods(new String[]{"GET", "POST", "PUT", "DELETE"})
         );
-        super.service(req, resp);
+        if (req.getMethod().equals("PATCH")) {
+            super.resp = resp;
+            this.doPatch(req, resp);
+        } else {
+            super.service(req, resp);
+        }
     }
 
     @Override
@@ -64,22 +72,11 @@ public class CartServlet extends RestServlet {
             return;
         }
 
-        String jsonString;
-        JsonElement json;
+        JsonObject json;
         try {
-            jsonString = stringReader.read(req.getInputStream());
-            try {
-                json = gson.fromJson(jsonString, JsonElement.class);
-                if (!json.isJsonObject()) {
-                    super.sendRest(422, "JSON root must be an object");
-                    return;
-                }
-            }catch (Exception e){
-                super.sendRest(400, "JSON could not be parsed");
-                return;
-            }
+            json = parseBodyAsObject(req);
 
-            JsonElement element = json.getAsJsonObject().get("userId");
+            JsonElement element = json.get("userId");
             if (element == null) {
                 super.sendRest(422, "JSON must have 'userId' field' ");
                 return;
@@ -90,7 +87,7 @@ public class CartServlet extends RestServlet {
                 super.sendRest(403, "Authorization mismatch");
             }
 
-            element = json.getAsJsonObject().get("productId");
+            element = json.get("productId");
             if (element == null) {
                 super.sendRest(422, "JSON must have 'productId' field' ");
                 return;
@@ -98,13 +95,13 @@ public class CartServlet extends RestServlet {
             UUID cartProductId;
             try {
                 cartProductId = UUID.fromString(element.getAsString());
-            }catch (Exception e){
+            } catch (Exception e) {
                 super.sendRest(400, "product id must be a valid UUID");
                 return;
             }
 
             int quantity;
-            element = json.getAsJsonObject().get("quantity");
+            element = json.get("quantity");
             if (element == null) {
                 quantity = 1;
             }
@@ -114,23 +111,19 @@ public class CartServlet extends RestServlet {
                     super.sendRest(400, "quantity must be a positive integer");
                     return;
                 }
-            }catch (Exception e){
+            } catch (Exception e) {
                 super.sendRest(422, "Invalid quantity");
                 return;
             }
 
 
-            if(cartDao.add(UUID.fromString(userId) , cartProductId, quantity)){
-                super.sendRest(201, jsonString);
-            }
-            else {
+            if (cartDao.add(UUID.fromString(userId), cartProductId, quantity)) {
+                super.sendRest(201, "CODE WORKS");
+            } else {
                 super.sendRest(500, "See server log for details");
             }
-
-
-        } catch (IOException e) {
-            logger.warning(e.getMessage());
-            super.sendRest(400, "JSON could not be extracted");
+        } catch (ParseException e) {
+            super.sendRest(415, "Bad request");
         }
 
 
@@ -148,5 +141,109 @@ public class CartServlet extends RestServlet {
         params.put("userId", userId);
         super.restResponse.getMeta().setParams(params);
         super.sendRest(200, cartDao.getCart(userId));
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        JsonObject json;
+        try {
+            json = parseBodyAsObject(req);
+        } catch (ParseException ex) {
+            super.sendRest(400, "Bad request");
+            return;
+        }
+
+        JsonElement element = json.get("cartId");
+        if (element == null) {
+            super.sendRest(422, "JSON must have 'cartId' field' ");
+            return;
+        }
+        String tmpData = element.getAsString();
+        UUID cartUuId;
+        try {
+            cartUuId = UUID.fromString(tmpData);
+        } catch (IllegalArgumentException ignored) {
+            super.sendRest(400, "Invalid cartId");
+            return;
+        }
+
+        element = json.get("productId");
+        if (element == null) {
+            super.sendRest(422, "JSON must have 'productId' field' ");
+            return;
+        }
+        tmpData = element.getAsString();
+        UUID producttUuId;
+        try {
+            producttUuId = UUID.fromString(tmpData);
+        } catch (IllegalArgumentException ignored) {
+            super.sendRest(400, "Invalid productId");
+            return;
+        }
+
+        element = json.get("delta");
+        if (element == null) {
+            super.sendRest(422, "JSON must have 'productId' field' ");
+            return;
+        }
+        int delta = element.getAsInt();
+
+        try {
+            if (cartDao.update(cartUuId, producttUuId, delta)) {
+                super.sendRest(200, "Updated");
+            } else {
+                super.sendRest(409, "Invalid data");
+            }
+        } catch (Exception e) {
+            super.sendRest(500, "See server log for details");
+        }
+
+    }
+
+    protected void doPatch(HttpServletRequest req, HttpServletResponse resp) throws ServletException,IOException {
+        UUID cartId;
+        try {
+            cartId = UUID.fromString(req.getParameter("cart-id"));
+        } catch (IllegalArgumentException ignored) {
+            super.sendRest(400, "Missing important field 'cart-id'");
+            return;
+        }
+
+        boolean isCanceled = Boolean.parseBoolean(req.getParameter("is-canceled"));
+
+        super.sendRest(202, cartDao.closeCart(cartId, isCanceled));
+    }
+
+    private JsonObject parseBodyAsObject(HttpServletRequest req) throws ParseException {
+        JsonElement json = parseBody(req);
+        if (!json.isJsonObject()) {
+            throw new ParseException("JSON root must be a JSON object", 422);
+        }
+        return json.getAsJsonObject();
+    }
+
+    private JsonElement parseBody(HttpServletRequest req) throws ParseException {
+
+        if (!req.getContentType().startsWith("application/json")) {
+            throw new ParseException("application/json media type expected", 415);
+        }
+
+        String jsonString;
+        JsonElement json;
+        try {
+            jsonString = stringReader.read(req.getInputStream());
+            try {
+                json = gson.fromJson(jsonString, JsonElement.class);
+                return json;
+            } catch (Exception e) {
+                logger.warning(e.getMessage());
+                throw new ParseException("JSON could not be parsed", 400);
+            }
+        } catch (Exception e) {
+            logger.warning(e.getMessage());
+        }
+
+
+        return null;
     }
 }

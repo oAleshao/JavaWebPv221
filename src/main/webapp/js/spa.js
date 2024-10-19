@@ -34,7 +34,6 @@ async function request(url, params) {
 
 }
 
-
 const initialState = {
     page: "home",
     auth: {
@@ -302,7 +301,6 @@ function Spa() {
                 }}>Cart({state.cart.reduce((cnt, c) => cnt + c.quantity, 0)} ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)})</b>&emsp;
 
 
-
                 {state.page === "home" && <Home key={"UNIQUE HOME"}/>}
                 {state.page === "shop" && state.auth.user_role && state.auth.user_role.canCreate &&
                     <Shop key={"UNIQUE SHOP"}/>}
@@ -528,23 +526,67 @@ function Shop() {
 
 function Cart() {
     const {state, dispatch, loadCart} = React.useContext(StateContext);
+    const updateQuantity = React.useCallback((cartItem, delta) => {
+        if (+cartItem.quantity + delta === 0) {
+            if (!confirm(`Do your really want to delete '${cartItem.product.name}' from cart?`)) {
+                return;
+            }
+        }
+        request("/shop/cart", {
+            method: "PUT",
+            headers: {
+                Authorization: "Bearer " + state.auth.token.tokenId,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                cartId: cartItem.cartId,
+                productId: cartItem.productId,
+                delta: delta
+            })
+        }).then(() => loadCart())
+            .catch(console.log)
+    });
     const changeQuantity = React.useCallback((cartItem, action) => {
         switch (action) {
             case "inc":
-                console.log(cartItem, action);
+                updateQuantity(cartItem, 1);
                 break;
             case "dec":
-                console.log(cartItem, action);
+                updateQuantity(cartItem, -1);
                 break;
             case "del":
-                console.log(cartItem, action);
+                updateQuantity(cartItem, -cartItem.quantity);
                 break;
         }
-        loadCart();
+    });
+    const closeCart = React.useCallback((isCanceled) => {
+        if (!isCanceled) {
+            if (!confirm(`Buy everything for the amount ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)}`)){
+                return;
+            }
+        }
+        else{
+            if(!confirm("Do you really want to clear your cart!")){
+                return;
+            }
+        }
+        request(`/shop/cart?cart-id=${state.cart[0].cartId}&is-canceled=${isCanceled}`, {
+            method: "PATCH",
+            headers: {
+                Authorization: "Bearer " + state.auth.token.tokenId,
+                "Content-Type": "application/json"
+            }
+        }).then(() => loadCart())
+            .catch(console.log)
+
     });
     return <React.Fragment>
         <h1>Cart</h1>
         {state.cart.length > 0 && <div>
+            <button onClick={() => {
+                closeCart(true)
+            }}>Clear cart
+            </button>
             <div className={"cart-box"}>
                 {
                     state.cart.map(c =>
@@ -557,13 +599,19 @@ function Cart() {
                                 <div className={"counter-box"}>
                                     <section className={"quantity-box"}>
                                         <div>
-                                            <button>-</button>
+                                            <button onClick={() => {
+                                                changeQuantity(c, "dec")
+                                            }}>-
+                                            </button>
                                         </div>
                                         <div>
                                             {c.quantity}
                                         </div>
                                         <div>
-                                            <button>+</button>
+                                            <button onClick={() => {
+                                                changeQuantity(c, "inc")
+                                            }}>+
+                                            </button>
                                         </div>
                                     </section>
                                     <section className={"price-box"}>
@@ -571,7 +619,9 @@ function Cart() {
                                     </section>
                                 </div>
                                 <div className={"remove-box"}>
-                                    <button>
+                                    <button onClick={() => {
+                                        changeQuantity(c, "del")
+                                    }}>
                                         <i className="material-symbols-outlined">Remove</i>
                                     </button>
                                 </div>
@@ -582,6 +632,10 @@ function Cart() {
             <hr/>
             <div className={"total-price-box"}>
                 Total amount: ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)}
+                <button onClick={() => {
+                    closeCart(false)
+                }}>Buy
+                </button>
             </div>
         </div>
         }

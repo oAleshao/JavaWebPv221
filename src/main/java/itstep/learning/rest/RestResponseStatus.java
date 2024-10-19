@@ -15,6 +15,7 @@ public class RestResponseStatus {
             case 401: this.setSuccessful(false).setPhrase("Unauthorized").setCode(code); break;
             case 403: this.setSuccessful(false).setPhrase("Forbidden").setCode(code); break;
             case 404: this.setSuccessful(false).setPhrase("Not Found").setCode(code); break;
+            case 409: this.setSuccessful(false).setPhrase("Conflict").setCode(code); break;
             case 415: this.setSuccessful(false).setPhrase("Unsupported media type").setCode(code); break;
             case 422: this.setSuccessful(false).setPhrase("Unprocessable entity").setCode(code); break;
             case 500: this.setSuccessful(false).setPhrase("Internal Server Error").setCode(code); break;

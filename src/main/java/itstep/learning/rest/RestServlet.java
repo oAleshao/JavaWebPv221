@@ -11,7 +11,7 @@ import java.io.IOException;
 
 public class RestServlet extends HttpServlet {
     protected final static Gson gson = new GsonBuilder().serializeNulls().create();
-    private HttpServletResponse resp;
+    protected HttpServletResponse resp;
 
     protected RestResponse restResponse;
 

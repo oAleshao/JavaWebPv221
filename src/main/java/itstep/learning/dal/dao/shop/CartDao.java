@@ -47,6 +47,71 @@ public class CartDao {
 
     }
 
+    public boolean closeCart(UUID cartId, boolean isCanceled){
+        String sql = "UPDATE carts SET close_dt = CURRENT_TIMESTAMP, is_canceled = ? WHERE cart_id = ?";
+        try(PreparedStatement prop = connection.prepareStatement(sql)){
+            prop.setInt(1, isCanceled ? 1 : 0);
+            prop.setString(2, cartId.toString());
+            prop.executeUpdate();
+            return true;
+        }catch (Exception ex){
+            logger.log(Level.WARNING, ex.getMessage() + " -- " + sql, ex);
+            return false;
+        }
+    }
+
+    public boolean update(UUID cartId, UUID productId, int delta) throws Exception{
+        if (cartId == null || productId == null || delta == 0) {
+            return false;
+        }
+
+        int count = 0;
+        String sql = "SELECT quantity FROM cart_items c WHERE c.cart_id = ? AND c.product_id = ?";
+        try (PreparedStatement prop = connection.prepareStatement(sql)) {
+            prop.setString(1, cartId.toString());
+            prop.setString(2, productId.toString());
+            ResultSet rs = prop.executeQuery();
+            if (rs.next()) {
+                count = rs.getInt(1);
+            }
+            else {
+                return false;
+            }
+
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, e.getMessage() + " -- " + sql, e);
+            throw new Exception();
+        }
+
+        count += delta;
+        if(count < 0) return false;
+        if(count == 0){
+            sql = "DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?";
+        }
+        else {
+            sql = "UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND product_id = ?";
+        }
+
+        try(PreparedStatement prop = connection.prepareStatement(sql)) {
+            if(count == 0) {
+                prop.setString(1, cartId.toString());
+                prop.setString(2, productId.toString());
+            }
+            else {
+                prop.setInt(1, count);
+                prop.setString(2, cartId.toString());
+                prop.setString(3, productId.toString());
+
+            }
+            prop.executeUpdate();
+
+            return true;
+        }catch (Exception e) {
+            logger.log(Level.WARNING, e.getMessage() + " -- " + sql, e);
+            throw new Exception();
+        }
+    }
+
     public boolean add(UUID userId, UUID productId, int quantity) {
         UUID cartId = null;
         String sql = "SELECT c.cart_id FROM carts c WHERE c.user_id = ? AND c.close_dt IS NULL";
