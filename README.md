@@ -7,5 +7,5 @@
 
 
 
-![Image alt](https://github.com/oAleshao/JavaWebPv221/raw/master/idea/readmeImg/Screenshot2024-10-17203959.png)
+![Image alt](https://github.com/oAleshao/JavaWebPv221/raw/master/idea/readmeImg/Screenshot%202024-10-17%20203959.png)
 
