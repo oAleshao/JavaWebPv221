@@ -5,5 +5,7 @@
 {branch} — ветка репозитория;
 {path} — путь к месту нахождения картинки.
 
-![Image alt](https://github.com/oAleshao/JavaWebPv221/raw/master/.idea/readmeImg/Screenshot 2024-10-17 203959.png)
+Screenshot 2024-10-17 203959.png
+
+![Image alt](https://github.com/oAleshao/JavaWebPv221/raw/master/.idea/readmeImg/image.png)
 
