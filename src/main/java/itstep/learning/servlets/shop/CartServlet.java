@@ -64,8 +64,14 @@ public class CartServlet extends RestServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String userId = (String) req.getAttribute("Claims.Sid");
         if (userId == null || userId.isEmpty()) {
-            super.sendRest(401, "Auth token required");
-            return;
+            String tmpId = (String) req.getAttribute("Claims.TmpSid");
+            if(tmpId != null) {
+                userId = tmpId;
+            }
+            else {
+                super.sendRest(401, "Auth token required");
+                return;
+            }
         }
         if (!req.getContentType().startsWith("application/json")) {
             super.sendRest(415, "application/json media type expected");
@@ -132,9 +138,15 @@ public class CartServlet extends RestServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String userId = (String) req.getAttribute("Claims.Sid");
-        if (userId == null || userId.isEmpty()) {
-            super.sendRest(401, "Auth token required");
-            return;
+        if (userId == null) {
+            String tmpId = (String) req.getAttribute("Claims.TmpSid");
+            if(tmpId != null) {
+                userId = tmpId;
+            }
+            else {
+                super.sendRest(401, "Auth token required");
+                return;
+            }
         }
 
         Map<String, Object> params = new HashMap<String, Object>();

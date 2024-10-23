@@ -23,44 +23,86 @@ public class CartDao {
         this.logger = logger;
     }
 
-    public List<CartItem> getCart(String userId){
+    public List<CartItem> getCart(String userId) {
         UUID uuid;
-        try { uuid = UUID.fromString(userId); }
-        catch (Exception ignored) { return null; }
+        try {
+            uuid = UUID.fromString(userId);
+        } catch (Exception ignored) {
+            return null;
+        }
 
         String sql = "SELECT * FROM carts c " +
                 " JOIN cart_items ci ON c.cart_id = ci.cart_id " +
                 " JOIN products p ON p.product_id = ci.product_id " +
                 " WHERE c.user_id= ? AND c.close_dt IS NULL AND c.is_canceled = 0";
-        try(PreparedStatement prop = connection.prepareStatement(sql)){
+        try (PreparedStatement prop = connection.prepareStatement(sql)) {
             prop.setString(1, uuid.toString());
             ResultSet rs = prop.executeQuery();
             List<CartItem> cartItems = new ArrayList<>();
-            while (rs.next()){
+            while (rs.next()) {
                 cartItems.add(new CartItem(rs));
             }
             return cartItems;
-        }catch (Exception ex){
+        } catch (Exception ex) {
             logger.log(Level.WARNING, ex.getMessage() + " -- " + sql, ex);
             return null;
         }
 
     }
 
-    public boolean closeCart(UUID cartId, boolean isCanceled){
+    public UUID getLastCart(UUID userId) {
+
+        String sql = "SELECT cart_id FROM carts c WHERE c.user_id= ? AND c.close_dt IS NULL AND c.is_canceled = 0";
+        try (PreparedStatement prop = connection.prepareStatement(sql)) {
+            prop.setString(1, userId.toString());
+            ResultSet rs = prop.executeQuery();
+            if (rs.next()) {
+                return UUID.fromString(rs.getString("cart_id"));
+            }
+        } catch (Exception ex) {
+            logger.log(Level.WARNING, ex.getMessage() + " -- " + sql, ex);
+            return null;
+        }
+        return null;
+    }
+
+    public boolean setNewCart(String userId, String tmpId) {
+        UUID userUuid, tmpUuid;
+        try {
+            userUuid = UUID.fromString(userId);
+            tmpUuid = UUID.fromString(tmpId);
+        } catch (Exception ignored) {
+            return false;
+        }
+
+        System.out.println(userUuid + " " + tmpUuid);
+
+        String sql = "UPDATE carts SET user_id = ? WHERE user_id = ?";
+        try(PreparedStatement prop = connection.prepareStatement(sql)) {
+            prop.setString(1, userUuid.toString());
+            prop.setString(2, tmpUuid.toString());
+            prop.executeUpdate();
+            return true;
+        }catch (Exception ex) {
+            logger.log(Level.WARNING, ex.getMessage() + " -- " + sql, ex);
+        }
+        return  false;
+    }
+
+    public boolean closeCart(UUID cartId, boolean isCanceled) {
         String sql = "UPDATE carts SET close_dt = CURRENT_TIMESTAMP, is_canceled = ? WHERE cart_id = ?";
-        try(PreparedStatement prop = connection.prepareStatement(sql)){
+        try (PreparedStatement prop = connection.prepareStatement(sql)) {
             prop.setInt(1, isCanceled ? 1 : 0);
             prop.setString(2, cartId.toString());
             prop.executeUpdate();
             return true;
-        }catch (Exception ex){
+        } catch (Exception ex) {
             logger.log(Level.WARNING, ex.getMessage() + " -- " + sql, ex);
             return false;
         }
     }
 
-    public boolean update(UUID cartId, UUID productId, int delta) throws Exception{
+    public boolean update(UUID cartId, UUID productId, int delta) throws Exception {
         if (cartId == null || productId == null || delta == 0) {
             return false;
         }
@@ -73,8 +115,7 @@ public class CartDao {
             ResultSet rs = prop.executeQuery();
             if (rs.next()) {
                 count = rs.getInt(1);
-            }
-            else {
+            } else {
                 return false;
             }
 
@@ -84,20 +125,18 @@ public class CartDao {
         }
 
         count += delta;
-        if(count < 0) return false;
-        if(count == 0){
+        if (count < 0) return false;
+        if (count == 0) {
             sql = "DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?";
-        }
-        else {
+        } else {
             sql = "UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND product_id = ?";
         }
 
-        try(PreparedStatement prop = connection.prepareStatement(sql)) {
-            if(count == 0) {
+        try (PreparedStatement prop = connection.prepareStatement(sql)) {
+            if (count == 0) {
                 prop.setString(1, cartId.toString());
                 prop.setString(2, productId.toString());
-            }
-            else {
+            } else {
                 prop.setInt(1, count);
                 prop.setString(2, cartId.toString());
                 prop.setString(3, productId.toString());
@@ -106,7 +145,7 @@ public class CartDao {
             prop.executeUpdate();
 
             return true;
-        }catch (Exception e) {
+        } catch (Exception e) {
             logger.log(Level.WARNING, e.getMessage() + " -- " + sql, e);
             throw new Exception();
         }
@@ -154,19 +193,18 @@ public class CartDao {
             return false;
         }
 
-        if(count == 0){
+        if (count == 0) {
             sql = "INSERT INTO cart_items (quantity, cart_id, product_id) VALUES (?, ?, ?)";
-        }
-        else {
+        } else {
             sql = "UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND product_id = ?";
         }
 
-        try(PreparedStatement prop = connection.prepareStatement(sql)) {
+        try (PreparedStatement prop = connection.prepareStatement(sql)) {
             prop.setInt(1, count + quantity);
             prop.setString(2, cartId.toString());
             prop.setString(3, productId.toString());
             prop.executeUpdate();
-        }catch (Exception e) {
+        } catch (Exception e) {
             logger.log(Level.WARNING, e.getMessage() + " -- " + sql, e);
             return false;
         }

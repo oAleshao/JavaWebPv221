@@ -2,59 +2,40 @@
     apiHost: "http://localhost:8080/Java221"
 };
 
-async function request(url, params) {
-
-    if (url.startsWith('/')) {
-        url = env.apiHost + url;
-    }
-
-    // if (typeof params.headers == "undefined") {
-    //     params = {
-    //         ...params,
-    //         headers:{
-    //             Authorization: "Bearer " +
-    //         }
-    //     }
-    // } else if (typeof params.headers.Authorization == "undefined") {
-    //
-    // }
-
-    return new Promise((resolve, reject) => {
-        fetch(url, params)
-            .then(r => r.json())
-            .then(j => {
-                if (j.status.isSuccessful) {
-                    resolve(j.data);
-                } else {
-                    reject(j.data);
-                }
-            });
-    });
-
-
-}
 
 const initialState = {
     page: "home",
     auth: {
         token: null,
         user: null,
-        user_role: null
+        user_role: null,
+        tmpId: null
     },
     shop: {
         categories: []
     },
-    cart: []
+    cart: [],
+    error: null
 }
 
 function reducer(state, action) {
     switch (action.type) {
         case "auth":
+            window.localStorage.removeItem("tmpId_pv221");
             return {
                 ...state,
                 auth: {
                     ...state.auth,
-                    token: action.payload
+                    token: action.payload,
+                    tmpId: null
+                }
+            }
+        case "auth-tmp":
+            return {
+                ...state,
+                auth: {
+                    ...state.auth,
+                    tmpId: action.payload
                 }
             }
         case "updateUser":
@@ -92,6 +73,11 @@ function reducer(state, action) {
                 ...state,
                 cart: action.payload
             }
+        case "setError":
+            return {
+                ...state,
+                error: action.payload
+            }
         default:
             throw new Error("unkonwn action");
     }
@@ -99,17 +85,128 @@ function reducer(state, action) {
 
 const StateContext = React.createContext();
 
+function uuidv4() {
+
+    return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+
+        (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
+    );
+
+}
+
 function Spa() {
     const [state, dispatch] = React.useReducer(reducer, initialState);
-    const [login, setLogin] = React.useState("");
-    const [password, setPassword] = React.useState("");
-    const [error, setError] = React.useState(false);
-    const [isAuth, setAuth] = React.useState(false);
     const [resource, setResource] = React.useState("");
 
 
-    const loginChange = React.useCallback((e) => setLogin(e.target.value));
-    const passwordChange = React.useCallback((e) => setPassword(e.target.value));
+    const resourceClick = React.useCallback(() => {
+        const token = window.sessionStorage.getItem("token_pv221");
+        if (!token) {
+            alert("Something wrong with authorization");
+            return;
+        }
+
+        fetch("spa", {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + JSON.parse(token).tokenId,
+            }
+        }).then(r => r.json()).then(j => {
+            // if(j.status === "Error"){
+            //     window.sessionStorage.removeItem("token_pv221");
+            //     setAuth(false);
+            // }
+            setResource(JSON.stringify((j)));
+        });
+
+
+    });
+    const exitClick = React.useCallback(() => {
+        window.sessionStorage.removeItem("token_pv221");
+        window.sessionStorage.removeItem("userRole_pv221");
+        window.sessionStorage.removeItem("user_pv221");
+        window.location.reload();
+    });
+    const userLogOut = React.useCallback(() => {
+        document.querySelector("div.helper-box-exit").classList.toggle("nonactiveBox");
+    });
+    const checkToken = React.useCallback((forceAuth) => {
+        let token = window.sessionStorage.getItem("token_pv221");
+        if (token) {
+            token = JSON.parse(token);
+            if (new Date(token.exp) < new Date()) {
+                exitClick();
+            } else {
+                if (forceAuth) {
+                    dispatch({type: "auth", payload: token})
+                }
+            }
+        } else {
+            let tmpId = window.localStorage.getItem("tmpId_pv221")
+            if (tmpId != null) {
+                state.auth.tmpId = tmpId;
+                if (forceAuth) {
+                    // dispatch({type: "auth-tmp", payload: tmpId});
+                }
+            }
+        }
+    })
+    const navigate = React.useCallback((root) => {
+        const action = {type: "navigate", payload: root};
+        dispatch(action);
+    });
+    const hashWindow = React.useCallback(() => {
+        const hash = window.location.hash;
+        if (hash.length > 1) {
+            dispatch({type: "navigate", payload: hash.substring(1)});
+        }
+    })
+    const loadCart = React.useCallback(() => {
+        request("/shop/cart")
+            .then(data => dispatch({type: "setCart", payload: data}))
+            .catch(console.log)
+    });
+    const request = React.useCallback((url, params) => {
+
+        if (url.startsWith('/')) {
+            url = env.apiHost + url;
+        }
+
+        let bearer = null;
+        if (state.auth.token != null) {
+            bearer = state.auth.token.tokenId
+        } else if (state.auth.tmpId != null) {
+            bearer = state.auth.tmpId;
+        }
+
+
+        if (bearer) {
+            if (typeof params == "undefined") {
+                params = {};
+            }
+
+            if (typeof params.headers == "undefined") {
+                params.headers = {
+                    Authorization: "Bearer " + bearer
+                }
+            } else if (typeof params.headers.Authorization == "undefined") {
+                params.headers.Authorization = "Bearer " + bearer
+            }
+        }
+
+
+        return new Promise((resolve, reject) => {
+            fetch(url, params)
+                .then(r => r.json())
+                .then(j => {
+                    if (j.status.isSuccessful) {
+                        resolve(j.data);
+                    } else {
+                        reject(j.data);
+                    }
+                });
+        });
+    });
     const getUser = React.useCallback((tokenId) => {
         fetch('auth', {
             method: "GET",
@@ -135,95 +232,34 @@ function Spa() {
             .then(j => {
                 window.sessionStorage.setItem("userRole_pv221", JSON.stringify(j.data));
                 dispatch({type: "setUserRole", payload: j.data})
+                dispatch({type: "navigate", payload: "home"})
+                window.location.reload();
             })
     });
-    const authClick = React.useCallback(() => {
+    const authClick = React.useCallback((login, password) => {
         const credentials = btoa(login + ":" + password);
-        fetch(`auth`, {
+        let endpoint = "/auth";
+        if (state.auth.tmpId != null) {
+            endpoint += "?tmp-id=" + state.auth.tmpId;
+        }
+
+        request(endpoint, {
             method: "GET",
             headers: {
                 'Authorization': 'Basic ' + credentials
             }
-        }).then(r => r.json()).then(j => {
-                if (j.status.isSuccessful) {
-                    window.sessionStorage.setItem("token_pv221", JSON.stringify(j.data));
-                    getUser(j.data.tokenId);
-                    setAuth(true);
-                } else {
-                    setError(j.data);
-                }
-            }
-        );
+        }).then(data => {
+                window.sessionStorage.setItem("token_pv221", JSON.stringify(data));
+                getUser(data.tokenId);
+        }).catch(console.error);
     });
-    const resourceClick = React.useCallback(() => {
-        const token = window.sessionStorage.getItem("token_pv221");
-        if (!token) {
-            alert("Something wrong with authorization");
-            return;
-        }
 
-        fetch("spa", {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + JSON.parse(token).tokenId,
-            }
-        }).then(r => r.json()).then(j => {
-            // if(j.status === "Error"){
-            //     window.sessionStorage.removeItem("token_pv221");
-            //     setAuth(false);
-            // }
-            setResource(JSON.stringify((j)));
-        });
-
-
-    });
-    const exitClick = React.useCallback(() => {
-        window.sessionStorage.removeItem("token_pv221");
-        setAuth(false);
-    });
-    const userLogOut = React.useCallback(() => {
-        document.querySelector("div.helper-box-exit").classList.toggle("nonactiveBox");
-    });
-    const checkToken = React.useCallback((forceAuth) => {
-        let token = window.sessionStorage.getItem("token_pv221");
-        if (token) {
-            token = JSON.parse(token);
-            if (new Date(token.exp) < new Date()) {
-                exitClick();
-            } else {
-                if (forceAuth) {
-                    setAuth(true);
-                    dispatch({type: "auth", payload: token})
-                }
-            }
-        } else {
-            setAuth(false);
-        }
-    })
-    const navigate = React.useCallback((root) => {
-        const action = {type: "navigate", payload: root};
-        dispatch(action);
-    });
-    const hashWindow = React.useCallback(() => {
-        const hash = window.location.hash;
-        if (hash.length > 1) {
-            dispatch({type: "navigate", payload: hash.substring(1)});
-        }
-    })
-    const loadCart = React.useCallback(() => {
-        request("/shop/cart", {
-            headers: {
-                Authorization: "Bearer " + state.auth.token.tokenId,
-                "Content-Type": "application/json"
-            },
-        }).then(data => dispatch({type: "setCart", payload: data}))
-            .catch(console.log)
-    });
 
     React.useEffect(() => {
         hashWindow();
         window.addEventListener("hashchange", hashWindow)
         checkToken(true);
+
         let token = window.sessionStorage.getItem("token_pv221");
         if (token) {
             token = JSON.parse(token);
@@ -246,27 +282,16 @@ function Spa() {
         }
     }, []);
     React.useEffect(() => {
-        if (state.auth.token != null) {
+        if (state.auth.token != null || state.auth.tmpId != null) {
             loadCart();
         } else {
             dispatch({type: "setCart", payload: []})
         }
     }, [state.auth])
-
-    return (<StateContext.Provider value={{state, dispatch, loadCart}}>
+    return (<StateContext.Provider value={{state, dispatch, loadCart, request, authClick}}>
         <h1>Spa</h1>
-        {!isAuth &&
-            <div>
-                <b>Login</b>
-                <input placeholder="login" onChange={loginChange}/>
-                <b>Password</b>
-                <input type="password" onChange={passwordChange} placeholder="password"/>
-                <button onClick={authClick}>Get Token</button>
-                {error && <b> {error} </b>}
-            </div>
-        }
-        {isAuth &&
-            <div>
+        <div>
+            {state.auth.user &&
                 <div className={"buttons-block"}>
                     <button onClick={resourceClick} className="btn cyan">Resource</button>
                     <p>{resource}</p>
@@ -278,42 +303,69 @@ function Spa() {
                             <button onClick={userLogOut}>Cancel</button>
                         </div>
                     </div>
-                    {state.auth.user &&
-                        <div className={"auth-user-box"}>
-                            <p>{state.auth.user.name}</p>
-                            <img src={"file/" + state.auth.user.avatar} alt={state.auth.user.avatar}/>
-                        </div>
-                    }
+
+                    <div className={"auth-user-box"}>
+                        <p>{state.auth.user.name}</p>
+                        <img src={"file/" + state.auth.user.avatar} alt={state.auth.user.avatar}/>
+                    </div>
+
                 </div>
+            }
 
-                <b key={"btnHome"} onClick={() => {
-                    navigate('home')
-                }}>Home</b>&emsp;
+            {!state.auth.user &&
+                <b key={"btnAuth"} onClick={() => {
+                    navigate('authPage')
+                }}>Log in</b>}&emsp;
 
-                {state.auth.user && state.auth.user_role && state.auth.user_role.canCreate &&
-                    <b key={"btnShop"} onClick={() => {
-                        navigate('shop')
-                    }}>Shop</b>
-                }&emsp;
+            <b key={"btnHome"} onClick={() => {
+                navigate('home')
+            }}>Home</b>&emsp;
 
-                <b onClick={() => {
-                    navigate('cart')
-                }}>Cart({state.cart.reduce((cnt, c) => cnt + c.quantity, 0)} ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)})</b>&emsp;
+            {state.auth.user && state.auth.user_role && state.auth.user_role.canCreate &&
+                <b key={"btnShop"} onClick={() => {
+                    navigate('shop')
+                }}>Shop</b>
+            }&emsp;
 
+            <b onClick={() => {
+                navigate('cart')
+            }}>Cart({state.cart.reduce((cnt, c) => cnt + c.quantity, 0)} ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)})</b>&emsp;
 
-                {state.page === "home" && <Home key={"UNIQUE HOME"}/>}
-                {state.page === "shop" && state.auth.user_role && state.auth.user_role.canCreate &&
-                    <Shop key={"UNIQUE SHOP"}/>}
-                {state.page === "cart" && <Cart/>}
-                {state.page.startsWith('category/') && <Category id={state.page.substring(9)}/>
-                }
-                {
-                    state.page.startsWith('product/') && <Product id={state.page.substring(8)}/>
-                }
+            {state.page === "authPage" && <AuthPage/>}
+            {state.page === "home" && <Home key={"UNIQUE HOME"}/>}
+            {state.page === "shop" && state.auth.user_role && state.auth.user_role.canCreate &&
+                <Shop key={"UNIQUE SHOP"}/>}
+            {state.page === "cart" && <Cart/>}
+            {state.page.startsWith('category/') && <Category id={state.page.substring(9)}/>
+            }
+            {
+                state.page.startsWith('product/') && <Product id={state.page.substring(8)}/>
+            }
 
-            </div>
-        }
+        </div>
+
     </StateContext.Provider>)
+}
+
+function AuthPage() {
+    const {state, authClick} = React.useContext(StateContext);
+    const [login, setLogin] = React.useState("");
+    const [password, setPassword] = React.useState("");
+
+    const loginChange = React.useCallback((e) => setLogin(e.target.value));
+    const passwordChange = React.useCallback((e) => setPassword(e.target.value));
+
+    return <div>
+        <b>Login</b>
+        <input placeholder="login" onChange={loginChange}/>
+        <b>Password</b>
+        <input type="password" onChange={passwordChange} placeholder="password"/>
+        <button onClick={() => {
+            authClick(login, password)
+        }}>Get Token
+        </button>
+        {state.error && <b> {state.error} </b>}
+    </div>
 }
 
 function Home() {
@@ -389,7 +441,7 @@ function Product({id}) {
 }
 
 function Category({id}) {
-    const {state, dispatch, loadCart} = React.useContext(StateContext);
+    const {state, dispatch, loadCart, request} = React.useContext(StateContext);
     const [products, setProducts] = React.useState(null);
     const addProduct = React.useCallback((e) => {
         e.preventDefault();
@@ -418,13 +470,24 @@ function Category({id}) {
             })
     });
     const addProductToCart = React.useCallback((id) => {
-        console.log(id);
-        const userId = state.auth.token.userId;
+        let userId;
+        let bearer;
+
+        if (state.auth.token === null) {
+            if (state.auth.tmpId == null) {
+                state.auth.tmpId = uuidv4();
+                window.localStorage.setItem("tmpId_pv221", state.auth.tmpId);
+            }
+            bearer = state.auth.tmpId;
+            userId = state.auth.tmpId;
+        } else {
+            bearer = state.auth.token.tokenId
+            userId = state.auth.token.userId;
+        }
 
         request("/shop/cart", {
             method: "POST",
             headers: {
-                Authorization: "Bearer " + state.auth.token.tokenId,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -525,7 +588,7 @@ function Shop() {
 }
 
 function Cart() {
-    const {state, dispatch, loadCart} = React.useContext(StateContext);
+    const {state, dispatch, loadCart, request} = React.useContext(StateContext);
     const updateQuantity = React.useCallback((cartItem, delta) => {
         if (+cartItem.quantity + delta === 0) {
             if (!confirm(`Do your really want to delete '${cartItem.product.name}' from cart?`)) {
@@ -535,7 +598,6 @@ function Cart() {
         request("/shop/cart", {
             method: "PUT",
             headers: {
-                Authorization: "Bearer " + state.auth.token.tokenId,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -560,20 +622,28 @@ function Cart() {
         }
     });
     const closeCart = React.useCallback((isCanceled) => {
-        if (!isCanceled) {
-            if (!confirm(`Buy everything for the amount ${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)}`)){
+        if (state.auth.token == null && !isCanceled) {
+            // the shopping cart is in unauthorized mode
+            if (confirm("You buy in anonymous mode. The history " +
+                "of purchases will not be saved, personal discounts are not taken into account." +
+                "Do you want to log in?")) {
+                dispatch({type: "navigate", payload: "authPage"});
                 return;
             }
         }
-        else{
-            if(!confirm("Do you really want to clear your cart!")){
+
+        if (!isCanceled) {
+            if (!confirm(`Buy everything for the amount $${state.cart.reduce((price, c) => price + c.quantity * c.product.price, 0)}`)) {
+                return;
+            }
+        } else {
+            if (!confirm("Do you really want to clear your cart!")) {
                 return;
             }
         }
         request(`/shop/cart?cart-id=${state.cart[0].cartId}&is-canceled=${isCanceled}`, {
             method: "PATCH",
             headers: {
-                Authorization: "Bearer " + state.auth.token.tokenId,
                 "Content-Type": "application/json"
             }
         }).then(() => loadCart())
@@ -648,6 +718,7 @@ function Cart() {
         }
     </React.Fragment>
 }
+
 
 const root = ReactDOM.createRoot(document.getElementById("spa-container"));
 root.render(<Spa/>);

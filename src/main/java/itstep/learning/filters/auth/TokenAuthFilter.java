@@ -45,6 +45,9 @@ public class TokenAuthFilter implements Filter {
                 req.setAttribute("Claims.Birthday", user.getBirthday());
                 req.setAttribute("Claims.Avatar", user.getAvatar());
             }
+            else{
+                req.setAttribute("Claims.TmpSid", token);
+            }
         }
 
         chain.doFilter(req, resp);

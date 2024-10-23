@@ -7,6 +7,7 @@ import com.google.inject.Singleton;
 import itstep.learning.dal.dao.RoleDao;
 import itstep.learning.dal.dao.TokenDao;
 import itstep.learning.dal.dao.UserDao;
+import itstep.learning.dal.dao.shop.CartDao;
 import itstep.learning.dal.dto.Role;
 import itstep.learning.dal.dto.Token;
 import itstep.learning.dal.dto.User;
@@ -28,19 +29,27 @@ public class AuthServlet extends RestServlet {
     private final TokenDao tokenDao;
     private final RoleDao roleDao;
     private final CacheMaster cacheMaster;
+    private final CartDao cartDao;
     int maxAge;
 
     @Inject
-    public AuthServlet(Logger logger, UserDao userDao, TokenDao tokenDao, RoleDao roleDao, CacheMaster cacheMaster) {
+    public AuthServlet(Logger logger,
+                       UserDao userDao,
+                       TokenDao tokenDao,
+                       RoleDao roleDao,
+                       CacheMaster cacheMaster,
+                       CartDao cartDao) {
         this.logger = logger;
         this.userDao = userDao;
         this.tokenDao = tokenDao;
         this.roleDao = roleDao;
         this.cacheMaster = cacheMaster;
+        this.cartDao = cartDao;
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+
 
         String authHeader = req.getHeader("Authorization");
 
@@ -87,6 +96,15 @@ public class AuthServlet extends RestServlet {
             if(user == null) {
                 super.sendRest(401, "Invalid login or password");
                 return;
+            }
+
+            UUID lastCartId = cartDao.getLastCart(user.getId());
+            String tmpId = req.getParameter("tmp-id");
+            if(lastCartId != null) {
+                cartDao.closeCart(lastCartId, false);
+            }
+            if(tmpId != null) {
+                cartDao.setNewCart(user.getId().toString(), tmpId);
             }
 
             Token token = tokenDao.create(user);
